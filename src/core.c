@@ -428,7 +428,8 @@ float iui_vector_pen_for_height(float font_height)
 {
     if (font_height <= 0.f)
         return 0.f;
-    return fmaxf(font_height / IUI_FONT_PEN_WIDTH_DIVISOR, 1.f);
+    return fmaxf(font_height / IUI_FONT_PEN_WIDTH_DIVISOR,
+                 IUI_FONT_PEN_WIDTH_MIN);
 }
 
 /* Calculate side bearing for vector text (space beyond glyph bounds)

@@ -346,40 +346,208 @@ static void sdl2_path_curve(float x1,
     iui_path_curve_to_scaled(&ctx->path, x1, y1, x2, y2, x3, y3, ctx->scale);
 }
 
+/* Geometry rendering macros and helpers for antialiased strokes.
+ *
+ * Design notes:
+ * - Primary use case is vector font rendering where Bezier curves are
+ *   tessellated into dense polylines. The high point density means adjacent
+ *   segments are nearly collinear, so explicit miter/bevel joins are not
+ *   needed (round caps at endpoints suffice).
+ * - For general-purpose polyline rendering with sharp corners, per-vertex
+ *   round joins would be needed to avoid gaps.
+ */
+#define TWO_PI 6.2831853f
+#define AA_FRINGE 0.5f /* Antialiasing fringe width in pixels */
+
+/* Batched geometry limits: 8 vertices + 18 indices per segment */
+#define STROKE_MAX_VERTS 2040   /* 255 segments × 8 */
+#define STROKE_MAX_INDICES 4590 /* 255 segments × 18 */
+
+/* Create SDL_Vertex with position and color (tex coords unused) */
+#define VERT(px, py, c) ((SDL_Vertex) {{(px), (py)}, (c), {0, 0}})
+
+/* Extract SDL_Color from packed ARGB uint32_t */
+#define COLOR_FROM_U32(c)   \
+    ((SDL_Color) {          \
+        ((c) >> 16) & 0xFF, \
+        ((c) >> 8) & 0xFF,  \
+        (c) & 0xFF,         \
+        ((c) >> 24) & 0xFF, \
+    })
+
+/* Emit a triangle (3 indices) */
+#define TRI(arr, i, a, b, c) \
+    do {                     \
+        (arr)[(i)++] = (a);  \
+        (arr)[(i)++] = (b);  \
+        (arr)[(i)++] = (c);  \
+    } while (0)
+
+/* Emit a quad as 2 triangles (6 indices): vertices in CCW order */
+#define QUAD(arr, i, a, b, c, d)  \
+    do {                          \
+        TRI((arr), (i), a, b, c); \
+        TRI((arr), (i), c, d, a); \
+    } while (0)
+
+/* Clamp adaptive segment count for circles/caps (MSVC-compatible) */
+static inline int clamp_segs(float radius, int lo, int hi)
+{
+    int s = (int) (radius * 2.5f);
+    return (s < lo) ? lo : ((s > hi) ? hi : s);
+}
+
+/* Draw antialiased round cap at endpoint using geometry triangles.
+ * Uses a center vertex + inner ring (solid) + outer ring (transparent fringe).
+ */
+static void draw_aa_cap(SDL_Renderer *r,
+                        float cx,
+                        float cy,
+                        float radius,
+                        SDL_Color solid,
+                        SDL_Color trans)
+{
+    if (radius < AA_FRINGE)
+        return;
+
+    int segs = clamp_segs(radius, 8, 24);
+
+    /* Vertex layout: center(1) + inner_ring(segs) + outer_ring(segs) */
+    SDL_Vertex v[49]; /* 1 + 24 + 24 max */
+    int idx[216];     /* 24 * 9 max */
+    int ii = 0;
+
+    float r_inner = radius - AA_FRINGE, r_outer = radius + AA_FRINGE;
+    if (r_inner < 0.f)
+        r_inner = 0.f;
+
+    float step = TWO_PI / (float) segs;
+
+    v[0] = VERT(cx, cy, solid);
+
+    for (int i = 0; i < segs; i++) {
+        float a = (float) i * step;
+        float cs = cosf(a), sn = sinf(a);
+        int next = (i + 1) % segs;
+
+        v[1 + i] = VERT(cx + cs * r_inner, cy + sn * r_inner, solid);
+        v[1 + segs + i] = VERT(cx + cs * r_outer, cy + sn * r_outer, trans);
+
+        /* Core fan triangle + fringe quad */
+        TRI(idx, ii, 0, 1 + i, 1 + next);
+        QUAD(idx, ii, 1 + i, 1 + segs + i, 1 + segs + next, 1 + next);
+    }
+
+    SDL_RenderGeometry(r, NULL, v, 1 + 2 * segs, idx, ii);
+}
+
 static void sdl2_path_stroke(float width, uint32_t color, void *user)
 {
     iui_port_ctx *ctx = (iui_port_ctx *) user;
+    int n = ctx->path.count;
 
-    if (ctx->path.count < 2) {
+    if (n < 2) {
         iui_path_reset(&ctx->path);
         return;
     }
 
-    set_color(ctx->renderer, color);
+    SDL_Color solid = COLOR_FROM_U32(color);
+    SDL_Color trans = solid;
+    trans.a = 0;
 
-    float hw = width * ctx->scale * 0.5f;
-    if (hw < 0.5f)
-        hw = 0.5f;
+    float stroke_w = width * ctx->scale;
+    if (stroke_w < 1.0f)
+        stroke_w = 1.0f;
 
-    int thickness = (int) (hw * 2 + 0.5f);
-    if (thickness < 1)
-        thickness = 1;
+    float r_total = stroke_w * 0.5f;
+    float r_inner = r_total - AA_FRINGE, r_outer = r_total + AA_FRINGE;
+    if (r_inner < 0.f)
+        r_inner = 0.f;
 
-    /* Draw path with thickness using Y-offset parallel lines.
-     * Note: Y-only offset works well for mostly-horizontal text strokes.
-     * For diagonal/vertical strokes, thickness may appear reduced.
+    /* Batched geometry: 8 vertices and 18 indices per segment.
+     * Max 255 segments per batch → 2040 verts, 4590 indices.
      */
-    for (int offset = -thickness / 2; offset <= thickness / 2; offset++) {
-        for (int i = 0; i < ctx->path.count - 1; i++) {
-            SDL_RenderDrawLineF(ctx->renderer, ctx->path.points_x[i],
-                                ctx->path.points_y[i] + (float) offset,
-                                ctx->path.points_x[i + 1],
-                                ctx->path.points_y[i + 1] + (float) offset);
+    SDL_Vertex verts[STROKE_MAX_VERTS];
+    int indices[STROKE_MAX_INDICES];
+    int vi = 0, ii = 0;
+
+    /* Track actual rendered endpoints for caps (skip degenerate segments) */
+    float cap_start_x = 0, cap_start_y = 0;
+    float cap_end_x = 0, cap_end_y = 0;
+    int has_start_cap = 0;
+
+    for (int i = 0; i < n - 1; i++) {
+        /* Flush if buffer would overflow (8 verts + 18 indices per seg) */
+        if (vi + 8 > STROKE_MAX_VERTS || ii + 18 > STROKE_MAX_INDICES) {
+            SDL_RenderGeometry(ctx->renderer, NULL, verts, vi, indices, ii);
+            vi = 0;
+            ii = 0;
         }
+
+        float x0 = ctx->path.points_x[i], y0 = ctx->path.points_y[i];
+        float x1 = ctx->path.points_x[i + 1], y1 = ctx->path.points_y[i + 1];
+
+        float dx = x1 - x0, dy = y1 - y0;
+        float len = sqrtf(dx * dx + dy * dy);
+
+        if (len < 0.001f)
+            continue;
+
+        /* Track first rendered segment's start for start cap */
+        if (!has_start_cap) {
+            cap_start_x = x0;
+            cap_start_y = y0;
+            has_start_cap = 1;
+        }
+        /* Always update end cap to last rendered segment's end */
+        cap_end_x = x1;
+        cap_end_y = y1;
+
+        /* Perpendicular unit vector scaled by radii */
+        float nx = -dy / len, ny = dx / len;
+        float in_x = nx * r_inner, in_y = ny * r_inner;
+        float out_x = nx * r_outer, out_y = ny * r_outer;
+
+        int b = vi; /* Base vertex index for this segment */
+
+        /* 8 vertices: outer/inner on left(+) and right(-) sides at both ends */
+        verts[vi++] = VERT(x0 + out_x, y0 + out_y, trans); /* 0: start outer+ */
+        verts[vi++] = VERT(x0 + in_x, y0 + in_y, solid);   /* 1: start inner+ */
+        verts[vi++] = VERT(x1 + in_x, y1 + in_y, solid);   /* 2: end inner+ */
+        verts[vi++] = VERT(x1 + out_x, y1 + out_y, trans); /* 3: end outer+ */
+        verts[vi++] = VERT(x0 - in_x, y0 - in_y, solid);   /* 4: start inner- */
+        verts[vi++] = VERT(x0 - out_x, y0 - out_y, trans); /* 5: start outer- */
+        verts[vi++] = VERT(x1 - in_x, y1 - in_y, solid);   /* 6: end inner- */
+        verts[vi++] = VERT(x1 - out_x, y1 - out_y, trans); /* 7: end outer- */
+
+        /* 3 quads: left fringe, solid core, right fringe */
+        QUAD(indices, ii, b + 0, b + 1, b + 2, b + 3); /* left fringe */
+        QUAD(indices, ii, b + 1, b + 4, b + 6, b + 2); /* core */
+        QUAD(indices, ii, b + 4, b + 5, b + 7, b + 6); /* right fringe */
+    }
+
+    /* Single batched draw call for all segments */
+    if (vi > 0)
+        SDL_RenderGeometry(ctx->renderer, NULL, verts, vi, indices, ii);
+
+    /* Round caps at actual rendered endpoints only */
+    if (has_start_cap) {
+        draw_aa_cap(ctx->renderer, cap_start_x, cap_start_y, r_total, solid,
+                    trans);
+        draw_aa_cap(ctx->renderer, cap_end_x, cap_end_y, r_total, solid, trans);
     }
 
     iui_path_reset(&ctx->path);
 }
+
+#undef TWO_PI
+#undef AA_FRINGE
+#undef STROKE_MAX_VERTS
+#undef STROKE_MAX_INDICES
+#undef VERT
+#undef COLOR_FROM_U32
+#undef TRI
+#undef QUAD
 
 /* Port Interface Implementation (iui_port_t) */
 

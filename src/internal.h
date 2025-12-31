@@ -62,7 +62,12 @@
 #define IUI_FONT_UNITS_PER_EM 64.f
 #endif
 #ifndef IUI_FONT_PEN_WIDTH_DIVISOR
-#define IUI_FONT_PEN_WIDTH_DIVISOR 40.f /* pen = font_height / 40 */
+/* pen = font_height / 32 (finer strokes) */
+#define IUI_FONT_PEN_WIDTH_DIVISOR 32.f
+#endif
+#ifndef IUI_FONT_PEN_WIDTH_MIN
+/* minimum pen width for HiDPI legibility */
+#define IUI_FONT_PEN_WIDTH_MIN 0.75f
 #endif
 #ifndef IUI_FONT_SIDE_BEARING_MIN
 #define IUI_FONT_SIDE_BEARING_MIN 0.6f /* minimum margin as scale factor */
@@ -608,6 +613,9 @@ static inline uint32_t iui_state_layer(uint32_t base_color, uint8_t alpha)
     return (base_color & 0x00FFFFFF) | ((uint32_t) alpha << 24);
 }
 
+/* Fixed-point division by 255: (x * 257 + 128) >> 16 gives exact x/255 */
+#define IUI_DIV255(x) (((x) * 257 + 128) >> 16)
+
 /* Blend two colors: dst over src with alpha (Porter-Duff "over") */
 static inline uint32_t iui_blend_color(uint32_t dst, uint32_t src)
 {
@@ -626,13 +634,15 @@ static inline uint32_t iui_blend_color(uint32_t dst, uint32_t src)
     uint32_t sg = (src >> 8) & 0xFF;
     uint32_t sb = src & 0xFF;
 
-    uint32_t oa = sa + (da * (255 - sa)) / 255;
+    uint32_t inv_sa = 255 - sa;
+    uint32_t oa = sa + IUI_DIV255(da * inv_sa);
     if (oa == 0)
         return 0;
 
-    uint32_t or = (sr * sa + dr * da * (255 - sa) / 255) / oa;
-    uint32_t og = (sg * sa + dg * da * (255 - sa) / 255) / oa;
-    uint32_t ob = (sb * sa + db * da * (255 - sa) / 255) / oa;
+    uint32_t da_inv = IUI_DIV255(da * inv_sa);
+    uint32_t or = (sr * sa + dr * da_inv) / oa;
+    uint32_t og = (sg * sa + dg * da_inv) / oa;
+    uint32_t ob = (sb * sa + db * da_inv) / oa;
 
     return (oa << 24) | (or << 16) | (og << 8) | ob;
 }
