@@ -58,12 +58,11 @@ static bool iui_fab_internal(iui_context *ctx,
     iui_draw_state_layer(ctx, fab_rect, corner_radius, content_color, state);
 
     /* Calculate content position */
-    float content_x = x;
     float center_y = y + fab_h * 0.5f;
 
     if (label) {
         /* Extended FAB: icon (optional) + label */
-        content_x = x + IUI_FAB_EXTENDED_PADDING;
+        float content_x = x + IUI_FAB_EXTENDED_PADDING;
 
         if (icon) {
             float icon_cx = content_x + icon_size * 0.5f;

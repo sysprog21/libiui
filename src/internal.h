@@ -988,7 +988,7 @@ void iui_draw_fab_icon(iui_context *ctx,
                        float cx,
                        float cy,
                        float size,
-                       const char *icon,
+                       const char *icon_name,
                        uint32_t color);
 
 /* Vector font rendering (implemented in core.c) */
@@ -1079,7 +1079,7 @@ bool iui_register_focusable(iui_context *ctx,
                             iui_rect_t bounds,
                             float corner);
 void iui_process_focus_navigation(iui_context *ctx);
-bool iui_widget_is_focused(iui_context *ctx, uint32_t id);
+bool iui_widget_is_focused(const iui_context *ctx, uint32_t id);
 
 /* Layout internal functions (iui_layout.c) */
 

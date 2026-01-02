@@ -874,7 +874,7 @@ bool iui_has_focus(const iui_context *ctx, const char *id)
 }
 
 /* Internal: Check if widget with given ID is focused */
-bool iui_widget_is_focused(iui_context *ctx, uint32_t id)
+bool iui_widget_is_focused(const iui_context *ctx, uint32_t id)
 {
     return ctx->focused_widget_id == id && id != 0;
 }
@@ -1340,6 +1340,7 @@ const char *iui_a11y_state_description(uint32_t state)
     APPEND_STATE(IUI_A11Y_STATE_HASPOPUP, "has popup")
 
 #undef APPEND_STATE
+    (void) count; /* suppress unused-after-final-increment warning */
     return buf;
 }
 

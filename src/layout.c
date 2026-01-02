@@ -95,10 +95,8 @@ void iui_row(iui_context *ctx, int items, const float *widths, float height)
         return;
 
     /* End previous row if any */
-    if (ctx->in_row) {
+    if (ctx->in_row)
         ctx->layout.y = ctx->row.next_row_y;
-        ctx->in_row = false;
-    }
 
     ctx->in_row = true;
     ctx->row.item_count = items;

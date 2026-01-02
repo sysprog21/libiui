@@ -751,17 +751,16 @@ bool iui_edit_with_selection(iui_context *ctx,
         state->is_dragging = false;
     }
 
-    /* Handle keyboard input when focused */
+    /* Handle keyboard input when focused and auto-scroll to keep cursor visible
+     */
     if (has_focus) {
         modified =
             iui_process_text_input_selection(ctx, buffer, buffer_size, state);
         /* Reset cursor blink on any key activity */
         if (ctx->key_pressed != IUI_KEY_NONE || ctx->char_input != 0)
             ctx->cursor_blink = 0.f;
-    }
 
-    /* Auto-scroll to keep cursor visible */
-    if (has_focus) {
+        /* Auto-scroll to keep cursor visible */
         float cursor_x_in_text =
             textfield_get_width_to_pos(ctx, buffer, state->cursor, false);
         if (cursor_x_in_text < state->scroll_offset)
@@ -990,7 +989,8 @@ iui_textfield_result iui_textfield_with_selection(
             has_focus = false;
             state->is_dragging = false;
         }
-    } else if (opts.disabled && has_focus) {
+    } else if (has_focus) {
+        /* Widget is disabled but still has focus - clear it */
         ctx->focused_edit = NULL;
         has_focus = false;
     }
@@ -1217,15 +1217,11 @@ bool iui_switch(iui_context *ctx,
         }
     }
 
-    /* Apply focus state layer */
+    /* Apply focus state layer and draw focus ring when focused */
     if (is_focused) {
         uint32_t focus_layer =
             iui_state_layer(ctx->colors.primary, IUI_STATE_FOCUS_ALPHA);
         track_color = iui_blend_color(track_color, focus_layer);
-    }
-
-    /* Draw focus ring when focused */
-    if (is_focused) {
         iui_draw_focus_ring(ctx, track_rect, corner);
     }
 
@@ -1525,16 +1521,14 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
     }
 
     /* Draw floating label */
-    float label_y;
-    uint32_t label_color =
-        options->disabled
-            ? iui_state_layer(ctx->colors.on_surface_variant,
-                              IUI_STATE_DISABLE_ALPHA)
-            : (is_open ? ctx->colors.primary : ctx->colors.on_surface_variant);
-
     if (options->label) {
+        uint32_t label_color =
+            options->disabled ? iui_state_layer(ctx->colors.on_surface_variant,
+                                                IUI_STATE_DISABLE_ALPHA)
+                              : (is_open ? ctx->colors.primary
+                                         : ctx->colors.on_surface_variant);
         /* Label floats above when there's a selection */
-        label_y = field_rect.y + 8.f;
+        float label_y = field_rect.y + 8.f;
         iui_internal_draw_text(ctx, field_rect.x + padding, label_y,
                                options->label, label_color);
     }

@@ -98,7 +98,6 @@ static int iui_tabs_internal(iui_context *ctx,
             is_selected ? ctx->colors.primary : ctx->colors.on_surface_variant;
 
         /* Calculate content position (centered) */
-        float content_y = tabs_y + tab_height * 0.5f;
         float text_width = iui_get_text_width(ctx, labels[i]);
 
         if (icons && icons[i]) {
@@ -122,6 +121,7 @@ static int iui_tabs_internal(iui_context *ctx,
                                    content_color);
         } else {
             /* Label only (centered vertically) */
+            float content_y = tabs_y + tab_height * 0.5f;
             float label_x = tab_x + (tab_width - text_width) * 0.5f,
                   label_y = content_y - ctx->font_height * 0.5f;
             iui_internal_draw_text(ctx, label_x, label_y, labels[i],

@@ -331,11 +331,8 @@ void iui_draw_fab_icon(iui_context *ctx,
                            cx + half * 0.3f, cy, stroke, color);
         iui_draw_line_soft(ctx, cx + half * 0.3f, cy, cx - half * 0.2f,
                            cy + half * 0.4f, stroke, color);
-    } else if (!strcmp(icon_name, "dot")) {
-        /* Filled dot */
-        iui_draw_circle_soft(ctx, cx, cy, size * 0.15f, color, 0, 0);
     } else {
-        /* Default: draw a simple dot/circle for unknown icons */
+        /* Default / "dot": draw a simple filled circle */
         iui_draw_circle_soft(ctx, cx, cy, size * 0.15f, color, 0, 0);
     }
 }

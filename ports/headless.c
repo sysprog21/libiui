@@ -929,7 +929,6 @@ bool iui_headless_save_screenshot(iui_port_ctx *ctx, const char *path)
     /* Adler-32 checksum */
     uint32_t adler = adler32(raw_data, raw_size);
     write_be32(zlib_data + zlib_pos, adler);
-    zlib_pos += 4;
 
     free(raw_data);
 

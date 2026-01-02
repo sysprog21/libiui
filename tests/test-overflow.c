@@ -129,9 +129,9 @@ static void test_large_coord_clip(void)
     bool success = iui_push_clip(ctx, large_clip);
     ASSERT_TRUE(success);
 
-    /* Verify coordinates were clamped to uint16 range */
-    ASSERT_TRUE(g_last_clip_max_x <= UINT16_MAX);
-    ASSERT_TRUE(g_last_clip_max_y <= UINT16_MAX);
+    /* Verify coordinates were clamped to uint16 max (150000 -> 65535) */
+    ASSERT_EQ(g_last_clip_max_x, UINT16_MAX);
+    ASSERT_EQ(g_last_clip_max_y, UINT16_MAX);
 
     iui_pop_clip(ctx);
 
@@ -249,10 +249,10 @@ static void test_slider_tracking_overflow(void)
     float values[IUI_MAX_TRACKED_SLIDERS + 10];
 
     for (int i = 0; i < IUI_MAX_TRACKED_SLIDERS + 10; i++) {
-        values[i] = 50.f;
-        values[i] = iui_slider_ex(ctx, values[i], 0.f, 100.f, 1.f, NULL);
+        values[i] = iui_slider_ex(ctx, 50.f, 0.f, 100.f, 1.f, NULL);
         iui_newline(ctx);
     }
+    (void) values; /* suppress unused warning - test only checks for crashes */
 
     /* Should not crash - overflow handled gracefully */
 

@@ -287,10 +287,11 @@ static void iui_divider_internal(iui_context *ctx, float left_inset)
     ctx->layout.y += 8.f;
 
     /* MD3: 1dp height, outline_variant color */
-    float x = ctx->layout.x + left_inset, w = ctx->layout.width - left_inset;
+    float w = ctx->layout.width - left_inset;
 
     /* Guard against negative width in narrow containers */
     if (w > 0.f) {
+        float x = ctx->layout.x + left_inset;
         ctx->renderer.draw_box((iui_rect_t) {x, ctx->layout.y, w, 1.f}, 0.f,
                                ctx->colors.outline_variant, ctx->renderer.user);
     }
@@ -537,10 +538,9 @@ iui_state_t iui_get_component_state(iui_context *ctx,
 
         if (ctx->mouse_pressed & IUI_MOUSE_LEFT)
             return IUI_STATE_PRESSED;
-    }
 
-    if (hovered)
         return IUI_STATE_HOVERED;
+    }
 
     return IUI_STATE_DEFAULT;
 }

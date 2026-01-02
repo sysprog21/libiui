@@ -228,14 +228,13 @@ int iui_dialog(iui_context *ctx,
             iui_state_t state = iui_get_component_state(ctx, btn_rect, false);
 
             /* Draw button based on position (rightmost:filled, others:text) */
-            uint32_t bg_color = 0;
             uint32_t text_color = ctx->colors.primary;
             /* MD3 button corner radius (full rounded) */
             float btn_corner = IUI_SHAPE_FULL;
 
             if (i == btn_count - 1) {
                 /* Primary button (rightmost) - filled style */
-                bg_color = ctx->colors.primary;
+                uint32_t bg_color = ctx->colors.primary;
                 text_color = ctx->colors.on_primary;
                 ctx->renderer.draw_box(btn_rect, btn_corner, bg_color,
                                        ctx->renderer.user);
@@ -376,9 +375,9 @@ bool iui_fullscreen_dialog_begin(iui_context *ctx,
     }
 
     /* Draw title after close icon */
-    float title_x = padding + touch_target + padding * 0.5f;
-    float title_y = (header_h - ctx->font_height) * 0.5f;
     if (dialog->title) {
+        float title_x = padding + touch_target + padding * 0.5f;
+        float title_y = (header_h - ctx->font_height) * 0.5f;
         iui_internal_draw_text(ctx, title_x, title_y, dialog->title,
                                ctx->colors.on_surface);
     }

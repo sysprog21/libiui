@@ -688,10 +688,10 @@ void iui_tooltip(iui_context *ctx, const char *text)
         x = win.x + win.width - width;
 
     /* Smart vertical positioning: check available space above and below */
-    float space_below =
-        (win.y + win.height) - (ctx->layout.y + ctx->row_height);
-    float space_above = ctx->layout.y - win.y;
     if (y + height > win.y + win.height) {
+        float space_below =
+            (win.y + win.height) - (ctx->layout.y + ctx->row_height);
+        float space_above = ctx->layout.y - win.y;
         /* Would overflow bottom - try flipping above if more space there */
         if (space_above > space_below && space_above >= height)
             y = ctx->layout.y - height - IUI_TOOLTIP_OFFSET;
@@ -759,10 +759,10 @@ bool iui_tooltip_rich(iui_context *ctx,
         x = win.x + win.width - width;
 
     /* Smart vertical positioning: check available space above and below */
-    float space_below =
-        (win.y + win.height) - (ctx->layout.y + ctx->row_height);
-    float space_above = ctx->layout.y - win.y;
     if (y + height > win.y + win.height) {
+        float space_below =
+            (win.y + win.height) - (ctx->layout.y + ctx->row_height);
+        float space_above = ctx->layout.y - win.y;
         /* Would overflow bottom - try flipping above if more space there */
         if (space_above > space_below && space_above >= height)
             y = ctx->layout.y - height - IUI_TOOLTIP_OFFSET;

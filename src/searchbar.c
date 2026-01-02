@@ -444,10 +444,10 @@ bool iui_search_view_suggestion(iui_context *ctx,
 
     /* Draw icon if provided */
     float content_x = padding;
-    float icon_cy = item_y + item_h * 0.5f;
 
     if (icon) {
         float icon_cx = padding + icon_size * 0.5f;
+        float icon_cy = item_y + item_h * 0.5f;
         iui_draw_fab_icon(ctx, icon_cx, icon_cy, icon_size, icon,
                           ctx->colors.on_surface_variant);
         content_x += icon_size + padding;
