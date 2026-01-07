@@ -1617,9 +1617,24 @@ int iui_get_layer_depth(const iui_context *ctx)
 
 void iui_field_tracking_frame_begin(iui_context *ctx)
 {
+    memset(ctx->field_tracking.textfield_ids, 0,
+           sizeof(ctx->field_tracking.textfield_ids));
+    memset(ctx->field_tracking.slider_ids, 0,
+           sizeof(ctx->field_tracking.slider_ids));
     ctx->field_tracking.textfield_count = 0;
     ctx->field_tracking.slider_count = 0;
     ctx->field_tracking.frame_number++;
+}
+
+/* Hash pointer to table index using multiplicative hash.
+ * Simple >> 3 shift causes collisions for page-aligned allocations (4KB apart).
+ * Knuth's multiplicative hash (golden ratio) provides better bit mixing.
+ */
+static inline uint32_t iui_ptr_hash_idx(const void *ptr, uint32_t mask)
+{
+    uint32_t h = (uint32_t) ((uintptr_t) ptr >> 3);
+    h *= 2654435769u; /* 2^32 / phi (golden ratio) */
+    return h & mask;
 }
 
 void iui_register_textfield(iui_context *ctx, void *buffer)
@@ -1627,15 +1642,24 @@ void iui_register_textfield(iui_context *ctx, void *buffer)
     if (!buffer)
         return;
 
-    /* Check if already registered this frame */
-    for (int i = 0; i < ctx->field_tracking.textfield_count; i++)
-        if (ctx->field_tracking.textfield_ids[i] == buffer)
+    /* Hash index with linear probing for collisions */
+    uint32_t idx = iui_ptr_hash_idx(buffer, IUI_MAX_TRACKED_TEXTFIELDS - 1);
+
+    /* Probe entire table until finding empty slot or duplicate */
+    for (int probe = 0; probe < IUI_MAX_TRACKED_TEXTFIELDS; probe++) {
+        void *cached = ctx->field_tracking.textfield_ids[idx];
+        if (!cached) {
+            /* Found empty slot, insert here */
+            ctx->field_tracking.textfield_ids[idx] = buffer;
+            ctx->field_tracking.textfield_count++;
+            return;
+        }
+        if (cached == buffer) /* Already registered, done */
             return;
 
-    /* Add to tracking array if space available */
-    if (ctx->field_tracking.textfield_count < IUI_MAX_TRACKED_TEXTFIELDS)
-        ctx->field_tracking
-            .textfield_ids[ctx->field_tracking.textfield_count++] = buffer;
+        /* Collision, continue probing */
+        idx = (idx + 1) & (IUI_MAX_TRACKED_TEXTFIELDS - 1);
+    }
 }
 
 void iui_register_slider(iui_context *ctx, uint32_t slider_id)
@@ -1643,30 +1667,62 @@ void iui_register_slider(iui_context *ctx, uint32_t slider_id)
     if (slider_id == 0)
         return;
 
-    /* Check if already registered this frame */
-    for (int i = 0; i < ctx->field_tracking.slider_count; i++)
-        if (ctx->field_tracking.slider_ids[i] == slider_id)
-            return;
+    /* Direct hash index with linear probing for collisions */
+    uint32_t idx = slider_id & (IUI_MAX_TRACKED_SLIDERS - 1);
 
-    /* Add to tracking array if space available */
-    if (ctx->field_tracking.slider_count < IUI_MAX_TRACKED_SLIDERS)
-        ctx->field_tracking.slider_ids[ctx->field_tracking.slider_count++] =
-            slider_id;
+    /* Probe entire table until finding empty slot or duplicate */
+    for (int probe = 0; probe < IUI_MAX_TRACKED_SLIDERS; probe++) {
+        uint32_t cached = ctx->field_tracking.slider_ids[idx];
+        if (!cached) {
+            /* Found empty slot, insert here */
+            ctx->field_tracking.slider_ids[idx] = slider_id;
+            ctx->field_tracking.slider_count++;
+            return;
+        }
+        if (cached == slider_id) {
+            /* Already registered, done */
+            return;
+        }
+        /* Collision, continue probing */
+        idx = (idx + 1) & (IUI_MAX_TRACKED_SLIDERS - 1);
+    }
 }
 
 bool iui_textfield_is_registered(const iui_context *ctx, const void *buffer)
 {
-    for (int i = 0; i < ctx->field_tracking.textfield_count; i++)
-        if (ctx->field_tracking.textfield_ids[i] == buffer)
+    if (!buffer)
+        return false;
+
+    uint32_t idx = iui_ptr_hash_idx(buffer, IUI_MAX_TRACKED_TEXTFIELDS - 1);
+
+    /* Probe entire table looking for match or empty slot */
+    for (int probe = 0; probe < IUI_MAX_TRACKED_TEXTFIELDS; probe++) {
+        void *cached = ctx->field_tracking.textfield_ids[idx];
+        if (cached == buffer)
             return true;
+        if (!cached)
+            return false;
+        idx = (idx + 1) & (IUI_MAX_TRACKED_TEXTFIELDS - 1);
+    }
     return false;
 }
 
 bool iui_slider_is_registered(const iui_context *ctx, uint32_t slider_id)
 {
-    for (int i = 0; i < ctx->field_tracking.slider_count; i++)
-        if (ctx->field_tracking.slider_ids[i] == slider_id)
+    if (slider_id == 0)
+        return false;
+
+    uint32_t idx = slider_id & (IUI_MAX_TRACKED_SLIDERS - 1);
+
+    /* Probe entire table looking for match or empty slot */
+    for (int probe = 0; probe < IUI_MAX_TRACKED_SLIDERS; probe++) {
+        uint32_t cached = ctx->field_tracking.slider_ids[idx];
+        if (cached == slider_id)
             return true;
+        if (!cached)
+            return false;
+        idx = (idx + 1) & (IUI_MAX_TRACKED_SLIDERS - 1);
+    }
     return false;
 }
 
