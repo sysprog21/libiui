@@ -1438,19 +1438,7 @@ bool iui_radio(iui_context *ctx,
  * TextField-style component that reveals a menu of options
  */
 
-/* Static state for dropdown menu (one active at a time) */
-/* Dropdown menu state - single instance per UI context.
- * Thread-safety: This static state assumes single-threaded UI rendering.
- * Each thread/context should have its own UI instance. If multi-context
- * support is needed, move this state into iui_context.
- */
-static struct {
-    bool open;             /* menu is visible */
-    float x, y, width;     /* menu position and width */
-    int hovered_index;     /* currently hovered option */
-    int frames_since_open; /* frame counter for click protection */
-    const int *selected;   /* pointer to track which dropdown is active */
-} s_dropdown = {0};
+
 
 bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
 {
@@ -1481,8 +1469,8 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
     };
 
     /* Check if this dropdown's menu is open */
-    bool is_open =
-        s_dropdown.open && (s_dropdown.selected == options->selected_index);
+    bool is_open = ctx->dropdown.open &&
+                   (ctx->dropdown.selected == options->selected_index);
 
     /* Get field interaction state */
     iui_state_t state =
@@ -1560,27 +1548,27 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
     if (!options->disabled && state == IUI_STATE_PRESSED) {
         if (is_open) {
             /* Close menu */
-            s_dropdown.open = false;
+            ctx->dropdown.open = false;
         } else {
             /* Open menu */
-            s_dropdown.open = true;
-            s_dropdown.x = field_rect.x;
-            s_dropdown.y = field_rect.y + field_h;
-            s_dropdown.width = field_rect.width;
-            s_dropdown.hovered_index = selected;
-            s_dropdown.frames_since_open = 0;
-            s_dropdown.selected = options->selected_index;
+            ctx->dropdown.open = true;
+            ctx->dropdown.x = field_rect.x;
+            ctx->dropdown.y = field_rect.y + field_h;
+            ctx->dropdown.width = field_rect.width;
+            ctx->dropdown.hovered_index = selected;
+            ctx->dropdown.frames_since_open = 0;
+            ctx->dropdown.selected = options->selected_index;
         }
     }
 
     /* Draw menu if open */
     if (is_open) {
         /* Capture frame count BEFORE incrementing for click protection.
-         * This ensures the first frame after opening (frames_active == 0)
+         * This ensures that first frame after opening (frames_active == 0)
          * blocks clicks, preventing click-through from the field that opened
-         * this menu.
+         * menu.
          */
-        int frames_active = s_dropdown.frames_since_open++;
+        int frames_active = ctx->dropdown.frames_since_open++;
 
         /* Calculate menu height (capped at max) */
         float item_h = IUI_DROPDOWN_ITEM_HEIGHT;
@@ -1588,8 +1576,8 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
         if (menu_h > IUI_DROPDOWN_MENU_MAX_HEIGHT)
             menu_h = IUI_DROPDOWN_MENU_MAX_HEIGHT;
 
-        iui_rect_t menu_rect = {s_dropdown.x, s_dropdown.y, s_dropdown.width,
-                                menu_h};
+        iui_rect_t menu_rect = {ctx->dropdown.x, ctx->dropdown.y,
+                                ctx->dropdown.width, menu_h};
 
         /* Begin modal for menu */
         iui_begin_modal(ctx, "dropdown_menu_modal");
@@ -1612,7 +1600,7 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
             /* Update hovered index */
             if (item_state == IUI_STATE_HOVERED ||
                 item_state == IUI_STATE_PRESSED) {
-                s_dropdown.hovered_index = i;
+                ctx->dropdown.hovered_index = i;
             }
 
             /* Draw selection/hover background */
@@ -1640,7 +1628,7 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
             if (frames_active >= 1 && item_state == IUI_STATE_PRESSED) {
                 *options->selected_index = i;
                 selection_changed = (i != selected);
-                s_dropdown.open = false;
+                ctx->dropdown.open = false;
                 iui_close_modal(ctx);
             }
         }
@@ -1652,7 +1640,7 @@ bool iui_dropdown(iui_context *ctx, const iui_dropdown_options *options)
             bool mouse_pressed = (ctx->mouse_pressed & IUI_MOUSE_LEFT);
 
             if (!mouse_in_menu && !mouse_in_field && mouse_pressed) {
-                s_dropdown.open = false;
+                ctx->dropdown.open = false;
                 iui_close_modal(ctx);
             }
         }

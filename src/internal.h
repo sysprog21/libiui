@@ -440,6 +440,14 @@ struct iui_context {
     int menu_item_index;
     float menu_prev_height;
 
+    struct {
+        bool open;
+        float x, y, width;
+        int hovered_index;
+        int frames_since_open;
+        const int *selected;
+    } dropdown;
+
     /* COOL PATH - Scroll State */
     iui_scroll_state *active_scroll;
     iui_scroll_state *scroll_dragging;
