@@ -755,6 +755,88 @@ static void test_utf8_word_char(void)
     PASS();
 }
 
+static void test_selection_left_arrow(void)
+{
+    TEST(selection_left_arrow);
+    void *buffer = malloc(iui_min_memory_size());
+    iui_context *ctx = create_test_context(buffer, false);
+    ASSERT_NOT_NULL(ctx);
+
+    char text_buf[64] = "Hello World";
+    iui_edit_state state = {0};
+
+    /* Focus and set selection */
+    iui_update_mouse_pos(ctx, 200.0f, 150.0f);
+    iui_update_mouse_buttons(ctx, IUI_MOUSE_LEFT, 0);
+    iui_begin_frame(ctx, 1.0f / 60.0f);
+    iui_begin_window(ctx, "Test", 100, 100, 300, 200, 0);
+    iui_edit_with_selection(ctx, text_buf, sizeof(text_buf), &state);
+    iui_end_window(ctx);
+    iui_end_frame(ctx);
+    iui_update_mouse_buttons(ctx, 0, IUI_MOUSE_LEFT);
+
+    state.cursor = 8;
+    state.selection_start = 5;
+    state.selection_end = 8; /* " Wo" selected */
+
+    /* Press Left: should move cursor to selection_start and clear selection */
+    iui_update_key(ctx, IUI_KEY_LEFT);
+    iui_begin_frame(ctx, 1.0f / 60.0f);
+    iui_begin_window(ctx, "Test", 100, 100, 300, 200, 0);
+    iui_edit_with_selection(ctx, text_buf, sizeof(text_buf), &state);
+    iui_end_window(ctx);
+    iui_end_frame(ctx);
+
+    /* OLD behavior: cursor = 5
+       NEW behavior: cursor = 4 (because it moved left AGAIN) */
+    ASSERT_EQ(state.cursor, 5);
+    ASSERT_EQ(state.selection_start, 5);
+    ASSERT_EQ(state.selection_end, 5);
+
+    free(buffer);
+    PASS();
+}
+
+static void test_selection_right_arrow(void)
+{
+    TEST(selection_right_arrow);
+    void *buffer = malloc(iui_min_memory_size());
+    iui_context *ctx = create_test_context(buffer, false);
+    ASSERT_NOT_NULL(ctx);
+
+    char text_buf[64] = "Hello World";
+    iui_edit_state state = {0};
+
+    /* Focus and set selection */
+    iui_update_mouse_pos(ctx, 200.0f, 150.0f);
+    iui_update_mouse_buttons(ctx, IUI_MOUSE_LEFT, 0);
+    iui_begin_frame(ctx, 1.0f / 60.0f);
+    iui_begin_window(ctx, "Test", 100, 100, 300, 200, 0);
+    iui_edit_with_selection(ctx, text_buf, sizeof(text_buf), &state);
+    iui_end_window(ctx);
+    iui_end_frame(ctx);
+    iui_update_mouse_buttons(ctx, 0, IUI_MOUSE_LEFT);
+
+    state.cursor = 5;
+    state.selection_start = 5;
+    state.selection_end = 8; /* " Wo" selected */
+
+    /* Press Right: should move cursor to selection_end and clear selection */
+    iui_update_key(ctx, IUI_KEY_RIGHT);
+    iui_begin_frame(ctx, 1.0f / 60.0f);
+    iui_begin_window(ctx, "Test", 100, 100, 300, 200, 0);
+    iui_edit_with_selection(ctx, text_buf, sizeof(text_buf), &state);
+    iui_end_window(ctx);
+    iui_end_frame(ctx);
+
+    ASSERT_EQ(state.cursor, 8);
+    ASSERT_EQ(state.selection_start, 8);
+    ASSERT_EQ(state.selection_end, 8);
+
+    free(buffer);
+    PASS();
+}
+
 /* Button State Tests */
 
 static void test_button_state_sequence(void)
@@ -839,6 +921,8 @@ void run_input_tests(void)
     test_keyboard_word_navigation();
     test_keyboard_delete_at_end();
     test_keyboard_backspace_at_start();
+    test_selection_left_arrow();
+    test_selection_right_arrow();
     test_button_state_sequence();
     test_input_update_functions();
     SECTION_END();
