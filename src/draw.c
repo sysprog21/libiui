@@ -145,6 +145,42 @@ float iui_get_text_width(iui_context *ctx, const char *text)
     return width;
 }
 
+/* Get width of a Unicode codepoint. Uses renderer callback if available,
+ * otherwise falls back to built-in vector font.
+ *
+ * Note: For custom renderers, this measures single codepoints independently.
+ * Fonts with kerning may show slight cursor drift vs rendered text. For the
+ * built-in vector font (no kerning), width accumulation is exact.
+ */
+float iui_get_codepoint_width(iui_context *ctx, uint32_t cp)
+{
+    /* Clamp invalid codepoints to replacement character */
+    if (cp > 0x10FFFF)
+        cp = 0xFFFD;
+
+    if (ctx->renderer.text_width) {
+        /* Encode codepoint to UTF-8 for renderer callback */
+        char tmp[5] = {0};
+        if (cp < 0x80) {
+            tmp[0] = (char) cp;
+        } else if (cp < 0x800) {
+            tmp[0] = (char) (0xC0 | (cp >> 6));
+            tmp[1] = (char) (0x80 | (cp & 0x3F));
+        } else if (cp < 0x10000) {
+            tmp[0] = (char) (0xE0 | (cp >> 12));
+            tmp[1] = (char) (0x80 | ((cp >> 6) & 0x3F));
+            tmp[2] = (char) (0x80 | (cp & 0x3F));
+        } else {
+            tmp[0] = (char) (0xF0 | (cp >> 18));
+            tmp[1] = (char) (0x80 | ((cp >> 12) & 0x3F));
+            tmp[2] = (char) (0x80 | ((cp >> 6) & 0x3F));
+            tmp[3] = (char) (0x80 | (cp & 0x3F));
+        }
+        return ctx->renderer.text_width(tmp, ctx->renderer.user);
+    }
+    return iui_codepoint_width_vec(cp, ctx->font_height);
+}
+
 void iui_internal_draw_text(iui_context *ctx,
                             float x,
                             float y,

@@ -464,6 +464,24 @@ float iui_text_width_vec(const char *text, float font_height)
     return w;
 }
 
+/* Codepoint width measurement for built-in vector font.
+ * Returns the width of a Unicode codepoint at the given font height.
+ * Codepoints outside ASCII range (0x20-0x7E) use the fallback box glyph.
+ */
+float iui_codepoint_width_vec(uint32_t cp, float font_height)
+{
+    if (font_height <= 0.f)
+        return 0.f;
+
+    float scale = font_height / IUI_FONT_UNITS_PER_EM;
+    const float pen_w = iui_vector_pen_for_height(font_height);
+    const float side = iui_vector_side_bearing(scale, pen_w);
+    /* iui_get_glyph handles out-of-range codepoints by returning box glyph */
+    const signed char *g = iui_get_glyph((unsigned char) (cp > 0x7F ? 0 : cp));
+    float glyph_w = (float) (IUI_GLYPH_RIGHT(g) - IUI_GLYPH_LEFT(g)) * scale;
+    return glyph_w + side * 2.f;
+}
+
 /* Emit vector commands for drawing a glyph.
  * @ctx:     Current UI context
  * @g:       Pointer to glyph data

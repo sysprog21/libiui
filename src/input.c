@@ -284,7 +284,9 @@ iui_textfield_result iui_textfield(iui_context *ctx,
  * @text_x_start: Starting x position of text
  * @click_x:      X coordinate of mouse click
  *
- * Returns position in buffer closest to click_x.
+ * Returns byte position in buffer closest to click_x.
+ * Uses incremental width computation for O(n) complexity.
+ * Iterates by UTF-8 codepoint to ensure cursor lands on valid boundaries.
  */
 static size_t iui_find_cursor_from_x(iui_context *ctx,
                                      const char *buffer,
@@ -295,20 +297,26 @@ static size_t iui_find_cursor_from_x(iui_context *ctx,
     if (len == 0)
         return 0;
 
-    /* Binary search would be ideal, but linear scan is fine for typical lengths
-     */
     float best_dist = fabsf(click_x - text_x_start);
+    float cumulative_x = text_x_start;
+    size_t pos = 0;
 
-    char tmp[IUI_STRING_BUFFER_SIZE];
-    for (size_t i = 1; i <= len && i < sizeof(tmp); i++) {
-        memcpy(tmp, buffer, i);
-        tmp[i] = '\0';
-        float char_x = text_x_start + iui_get_text_width(ctx, tmp);
-        float dist = fabsf(click_x - char_x);
+    while (pos < len) {
+        /* Decode codepoint at current position */
+        uint32_t cp = iui_utf8_decode(buffer, pos, len);
+        size_t next_pos = iui_utf8_next(buffer, pos, len);
+
+        /* Accumulate width for this codepoint */
+        cumulative_x += iui_get_codepoint_width(ctx, cp);
+
+        /* Check if this boundary is closer to click position */
+        float dist = fabsf(click_x - cumulative_x);
         if (dist < best_dist) {
             best_dist = dist;
-            best_pos = i;
+            best_pos = next_pos;
         }
+
+        pos = next_pos;
     }
     return best_pos;
 }

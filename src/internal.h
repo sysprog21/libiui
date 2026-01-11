@@ -969,6 +969,7 @@ static inline bool iui_process_text_input(iui_context *ctx,
 
 /* Text rendering helpers (implemented in iui_draw.c) */
 float iui_get_text_width(iui_context *ctx, const char *text);
+float iui_get_codepoint_width(iui_context *ctx, uint32_t cp);
 void iui_internal_draw_text(iui_context *ctx,
                             float x,
                             float y,
@@ -1009,6 +1010,7 @@ void iui_compute_vector_metrics(float font_height,
                                 float *out_ascent_px,
                                 float *out_descent_px);
 float iui_vector_pen_for_height(float font_height);
+float iui_codepoint_width_vec(uint32_t cp, float font_height);
 
 /* Theme globals (defined in iui_core.c) */
 extern const iui_theme_t g_theme_light;
