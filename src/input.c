@@ -401,16 +401,13 @@ static bool iui_has_selection(const iui_edit_state *state)
     return state->selection_start != state->selection_end;
 }
 
-/* Process text input with selection support (UTF-8 aware) */
-static bool iui_process_text_input_selection(iui_context *ctx,
-                                             char *buffer,
-                                             size_t buffer_size,
-                                             iui_edit_state *state)
+/* Clamp cursor and selection to valid UTF-8 boundaries and buffer length */
+static void textfield_clamp_state(const char *buffer,
+                                  iui_edit_state *state,
+                                  size_t len)
 {
-    bool modified = false;
-    size_t len = strlen(buffer);
-
-    /* Clamp cursor to valid UTF-8 boundary */
+    if (!buffer)
+        return;
     if (state->cursor > len)
         state->cursor = len;
     while (state->cursor > 0 &&
@@ -420,35 +417,196 @@ static bool iui_process_text_input_selection(iui_context *ctx,
         state->selection_start = len;
     if (state->selection_end > len)
         state->selection_end = len;
+}
+
+/* Handle UTF-8 character insertion at cursor position */
+static bool textfield_insert_char(iui_context *ctx,
+                                  char *buffer,
+                                  size_t buffer_size,
+                                  size_t len,
+                                  iui_edit_state *state)
+{
+    if (!buffer || !state)
+        return false;
+    char utf8_buf[4];
+    size_t cp_len = iui_utf8_encode(ctx->char_input, utf8_buf);
+    if (len + cp_len < buffer_size && state->cursor + cp_len < buffer_size) {
+        memmove(buffer + state->cursor + cp_len, buffer + state->cursor,
+                len - state->cursor + 1);
+        memcpy(buffer + state->cursor, utf8_buf, cp_len);
+        state->cursor += cp_len;
+        state->selection_start = state->selection_end = state->cursor;
+        return true;
+    }
+    return false;
+}
+
+/* Move cursor left with Ctrl+word skip support */
+static void textfield_move_left(const char *buffer,
+                                size_t len,
+                                iui_edit_state *state,
+                                bool ctrl_held)
+{
+    if (!buffer || !state)
+        return;
+    if (ctrl_held) {
+        size_t prev = state->cursor;
+        while (prev > 0) {
+            prev = iui_utf8_prev(buffer, prev);
+            uint32_t cp = iui_utf8_decode(buffer, prev, len);
+            if (cp != ' ' && cp != '\t')
+                break;
+            state->cursor = prev;
+        }
+        while (state->cursor > 0) {
+            size_t prev = iui_utf8_prev(buffer, state->cursor);
+            uint32_t cp = iui_utf8_decode(buffer, prev, len);
+            if (!iui_utf8_is_word_char(cp))
+                break;
+            state->cursor = prev;
+        }
+    } else {
+        state->cursor = iui_utf8_prev(buffer, state->cursor);
+    }
+}
+
+/* Move cursor right with Ctrl+word skip support */
+static void textfield_move_right(const char *buffer,
+                                 size_t len,
+                                 iui_edit_state *state,
+                                 bool ctrl_held)
+{
+    if (!buffer || !state)
+        return;
+    if (ctrl_held) {
+        while (state->cursor < len) {
+            uint32_t cp = iui_utf8_decode(buffer, state->cursor, len);
+            if (!iui_utf8_is_word_char(cp))
+                break;
+            state->cursor = iui_utf8_next(buffer, state->cursor, len);
+        }
+        while (state->cursor < len) {
+            uint32_t cp = iui_utf8_decode(buffer, state->cursor, len);
+            if (cp != ' ' && cp != '\t')
+                break;
+            state->cursor = iui_utf8_next(buffer, state->cursor, len);
+        }
+    } else {
+        state->cursor = iui_utf8_next(buffer, state->cursor, len);
+    }
+}
+
+/* Handle cursor movement with selection extension */
+static void textfield_handle_cursor_movement(const char *buffer,
+                                             size_t len,
+                                             iui_edit_state *state,
+                                             bool shift_held,
+                                             bool ctrl_held,
+                                             enum iui_key_code key)
+{
+    if (!buffer || !state)
+        return;
+    if (key == IUI_KEY_LEFT) {
+        if (shift_held) {
+            if (state->cursor > 0) {
+                if (!iui_has_selection(state))
+                    state->selection_start = state->selection_end =
+                        state->cursor;
+                textfield_move_left(buffer, len, state, ctrl_held);
+                if (state->cursor < state->selection_start)
+                    state->selection_start = state->cursor;
+                else
+                    state->selection_end = state->cursor;
+            }
+        } else {
+            if (iui_has_selection(state)) {
+                iui_normalize_selection(state);
+                state->cursor = state->selection_start;
+            } else if (state->cursor > 0) {
+                textfield_move_left(buffer, len, state, ctrl_held);
+            }
+            state->selection_start = state->selection_end = state->cursor;
+        }
+    } else if (key == IUI_KEY_RIGHT) {
+        if (shift_held) {
+            if (state->cursor < len) {
+                if (!iui_has_selection(state))
+                    state->selection_start = state->selection_end =
+                        state->cursor;
+                textfield_move_right(buffer, len, state, ctrl_held);
+                if (state->cursor > state->selection_end)
+                    state->selection_end = state->cursor;
+                else
+                    state->selection_start = state->cursor;
+            }
+        } else {
+            if (iui_has_selection(state)) {
+                iui_normalize_selection(state);
+                state->cursor = state->selection_end;
+            } else if (state->cursor < len) {
+                textfield_move_right(buffer, len, state, ctrl_held);
+            }
+            state->selection_start = state->selection_end = state->cursor;
+        }
+    } else if (key == IUI_KEY_HOME) {
+        if (shift_held) {
+            if (!iui_has_selection(state))
+                state->selection_end = state->cursor;
+            state->cursor = 0;
+            state->selection_start = 0;
+        } else {
+            state->cursor = 0;
+            state->selection_start = state->selection_end = 0;
+        }
+    } else if (key == IUI_KEY_END) {
+        if (shift_held) {
+            if (!iui_has_selection(state))
+                state->selection_start = state->cursor;
+            state->cursor = len;
+            state->selection_end = len;
+        } else {
+            state->cursor = len;
+            state->selection_start = state->selection_end = len;
+        }
+    }
+}
+
+/* Process text input with selection support (UTF-8 aware) */
+static bool iui_process_text_input_selection(iui_context *ctx,
+                                             char *buffer,
+                                             size_t buffer_size,
+                                             iui_edit_state *state)
+{
+    bool modified = false;
+    size_t len = strlen(buffer);
+
+    textfield_clamp_state(buffer, state, len);
 
     bool shift_held = (ctx->modifiers & IUI_MOD_SHIFT) != 0;
     bool ctrl_held = (ctx->modifiers & IUI_MOD_CTRL) != 0;
 
     /* Character input - replace selection if active (UTF-8 aware) */
     if (ctx->char_input >= 32) {
-        /* Delete selection first if active */
         if (iui_has_selection(state)) {
             iui_delete_selection(buffer, state);
             len = strlen(buffer);
             modified = true;
         }
 
-        /* Encode and insert character at cursor */
-        char utf8_buf[4];
-        size_t cp_len = iui_utf8_encode(ctx->char_input, utf8_buf);
-        if (len + cp_len < buffer_size &&
-            state->cursor + cp_len < buffer_size) {
-            memmove(buffer + state->cursor + cp_len, buffer + state->cursor,
-                    len - state->cursor + 1);
-            memcpy(buffer + state->cursor, utf8_buf, cp_len);
-            state->cursor += cp_len;
-            state->selection_start = state->selection_end = state->cursor;
+        if (textfield_insert_char(ctx, buffer, buffer_size, len, state))
             modified = true;
-        }
     }
 
     /* Key handling with UTF-8 awareness */
     switch (ctx->key_pressed) {
+    case IUI_KEY_LEFT:
+    case IUI_KEY_RIGHT:
+    case IUI_KEY_HOME:
+    case IUI_KEY_END:
+        textfield_handle_cursor_movement(buffer, len, state, shift_held,
+                                         ctrl_held, ctx->key_pressed);
+        break;
+
     case IUI_KEY_BACKSPACE:
         if (iui_has_selection(state)) {
             modified = iui_delete_selection(buffer, state);
@@ -474,162 +632,6 @@ static bool iui_process_text_input_selection(iui_context *ctx,
             modified = true;
         }
         state->selection_start = state->selection_end = state->cursor;
-        break;
-
-    case IUI_KEY_LEFT:
-        if (shift_held) {
-            /* Extend selection left (UTF-8 aware) */
-            if (state->cursor > 0) {
-                if (!iui_has_selection(state)) {
-                    state->selection_start = state->selection_end =
-                        state->cursor;
-                }
-                if (ctrl_held) {
-                    /* Ctrl+Shift+Left: select word left (UTF-8 aware) */
-                    while (state->cursor > 0) {
-                        size_t prev = iui_utf8_prev(buffer, state->cursor);
-                        uint32_t cp = iui_utf8_decode(buffer, prev, len);
-                        if (cp != ' ' && cp != '\t')
-                            break;
-                        state->cursor = prev;
-                    }
-                    while (state->cursor > 0) {
-                        size_t prev = iui_utf8_prev(buffer, state->cursor);
-                        uint32_t cp = iui_utf8_decode(buffer, prev, len);
-                        if (!iui_utf8_is_word_char(cp))
-                            break;
-                        state->cursor = prev;
-                    }
-                } else {
-                    state->cursor = iui_utf8_prev(buffer, state->cursor);
-                }
-                /* Update selection based on cursor movement */
-                if (state->cursor < state->selection_start)
-                    state->selection_start = state->cursor;
-                else
-                    state->selection_end = state->cursor;
-            }
-        } else {
-            /* No shift: move cursor, clear selection */
-            if (iui_has_selection(state)) {
-                iui_normalize_selection(state);
-                state->cursor = state->selection_start;
-            } else if (state->cursor > 0) {
-                if (ctrl_held) {
-                    /* Ctrl+Left: skip word (UTF-8 aware) */
-                    while (state->cursor > 0) {
-                        size_t prev = iui_utf8_prev(buffer, state->cursor);
-                        uint32_t cp = iui_utf8_decode(buffer, prev, len);
-                        if (cp != ' ' && cp != '\t')
-                            break;
-                        state->cursor = prev;
-                    }
-                    while (state->cursor > 0) {
-                        size_t prev = iui_utf8_prev(buffer, state->cursor);
-                        uint32_t cp = iui_utf8_decode(buffer, prev, len);
-                        if (!iui_utf8_is_word_char(cp))
-                            break;
-                        state->cursor = prev;
-                    }
-                } else {
-                    state->cursor = iui_utf8_prev(buffer, state->cursor);
-                }
-            }
-            state->selection_start = state->selection_end = state->cursor;
-        }
-        break;
-
-    case IUI_KEY_RIGHT:
-        if (shift_held) {
-            /* Extend selection right (UTF-8 aware) */
-            if (state->cursor < len) {
-                if (!iui_has_selection(state)) {
-                    state->selection_start = state->selection_end =
-                        state->cursor;
-                }
-                if (ctrl_held) {
-                    /* Ctrl+Shift+Right: select word right (UTF-8 aware) */
-                    while (state->cursor < len) {
-                        uint32_t cp =
-                            iui_utf8_decode(buffer, state->cursor, len);
-                        if (!iui_utf8_is_word_char(cp))
-                            break;
-                        state->cursor =
-                            iui_utf8_next(buffer, state->cursor, len);
-                    }
-                    while (state->cursor < len) {
-                        uint32_t cp =
-                            iui_utf8_decode(buffer, state->cursor, len);
-                        if (cp != ' ' && cp != '\t')
-                            break;
-                        state->cursor =
-                            iui_utf8_next(buffer, state->cursor, len);
-                    }
-                } else {
-                    state->cursor = iui_utf8_next(buffer, state->cursor, len);
-                }
-                /* Update selection based on cursor movement */
-                if (state->cursor > state->selection_end)
-                    state->selection_end = state->cursor;
-                else
-                    state->selection_start = state->cursor;
-            }
-        } else {
-            /* No shift: move cursor, clear selection */
-            if (iui_has_selection(state)) {
-                iui_normalize_selection(state);
-                state->cursor = state->selection_end;
-            } else if (state->cursor < len) {
-                if (ctrl_held) {
-                    /* Ctrl+Right: skip word (UTF-8 aware) */
-                    while (state->cursor < len) {
-                        uint32_t cp =
-                            iui_utf8_decode(buffer, state->cursor, len);
-                        if (!iui_utf8_is_word_char(cp))
-                            break;
-                        state->cursor =
-                            iui_utf8_next(buffer, state->cursor, len);
-                    }
-                    while (state->cursor < len) {
-                        uint32_t cp =
-                            iui_utf8_decode(buffer, state->cursor, len);
-                        if (cp != ' ' && cp != '\t')
-                            break;
-                        state->cursor =
-                            iui_utf8_next(buffer, state->cursor, len);
-                    }
-                } else {
-                    state->cursor = iui_utf8_next(buffer, state->cursor, len);
-                }
-            }
-            state->selection_start = state->selection_end = state->cursor;
-        }
-        break;
-
-    case IUI_KEY_HOME:
-        if (shift_held) {
-            /* Extend selection to start */
-            if (!iui_has_selection(state))
-                state->selection_end = state->cursor;
-            state->cursor = 0;
-            state->selection_start = 0;
-        } else {
-            state->cursor = 0;
-            state->selection_start = state->selection_end = 0;
-        }
-        break;
-
-    case IUI_KEY_END:
-        if (shift_held) {
-            /* Extend selection to end */
-            if (!iui_has_selection(state))
-                state->selection_start = state->cursor;
-            state->cursor = len;
-            state->selection_end = len;
-        } else {
-            state->cursor = len;
-            state->selection_start = state->selection_end = len;
-        }
         break;
 
     default:
