@@ -29,6 +29,9 @@ iui_search_bar_result iui_search_bar_ex(iui_context *ctx,
     if (!ctx || !ctx->current_window || !buffer || !cursor || size == 0)
         return result;
 
+    /* Register this text field for per-frame tracking */
+    iui_register_textfield(ctx, buffer);
+
     /* Default icons */
     const char *lead_icon = leading_icon ? leading_icon : "search";
     bool has_text = (buffer[0] != '\0');
@@ -344,8 +347,9 @@ bool iui_search_view_begin(iui_context *ctx,
                            ctx->colors.surface_container_high,
                            ctx->renderer.user);
 
-    /* Auto-focus the search field */
+    /* Auto-focus the search field and register for tracking */
     ctx->focused_edit = search->query;
+    iui_register_textfield(ctx, search->query);
 
     /* Handle text input */
     iui_process_text_input(ctx, search->query, sizeof(search->query),

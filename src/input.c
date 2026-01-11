@@ -857,6 +857,9 @@ iui_textfield_result iui_textfield_with_selection(
     if (!ctx->current_window || !buffer || !state || size == 0)
         return result;
 
+    /* Register this text field for per-frame tracking */
+    iui_register_textfield(ctx, buffer);
+
     /* Default options if NULL */
     iui_textfield_options opts = {0};
     if (options)
