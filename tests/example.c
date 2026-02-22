@@ -27,6 +27,8 @@
 #include <time.h>
 #include "../include/iui.h"
 #include "../ports/port.h"
+#include "../src/font.h"
+#include "../src/internal.h"
 #include "../src/iui_config.h"
 
 /* Platform-specific includes */
@@ -1333,6 +1335,692 @@ static void draw_accessibility_window(iui_context *ui)
 }
 #endif /* CONFIG_DEMO_ACCESSIBILITY */
 
+#ifdef CONFIG_DEMO_FONT_EDITOR
+
+/* Font Editor: interactive vector glyph editor with canvas, control points,
+ * mouse selection, keyboard movement, and undo. Mimics
+ * externals/mado/tools/font-edit but uses zero heap allocations.
+ */
+
+#define FE_MAX_OPS 64
+#define FE_MAX_POINTS 192
+#define FE_UNDO_DEPTH 8
+
+typedef enum {
+    FE_OP_MOVE,
+    FE_OP_LINE,
+    FE_OP_CURVE,
+} fe_op_type_t;
+
+typedef struct {
+    fe_op_type_t type;
+    int n_pts;    /* 1 for move/line, 3 for curve */
+    int pt_start; /* index into points[] */
+} fe_op_t;
+
+typedef struct {
+    float x, y;
+} fe_point_t;
+
+typedef struct {
+    fe_op_t ops[FE_MAX_OPS];
+    int n_ops;
+    fe_point_t points[FE_MAX_POINTS];
+    int n_points;
+    int left, right, ascent, descent;
+} fe_glyph_t;
+
+typedef struct {
+    int op_idx; /* -1 = none */
+    int pt_idx; /* index into glyph points[], -1 = none */
+} fe_selection_t;
+
+typedef struct {
+    int selected_char;
+    float zoom;
+    fe_glyph_t glyph;
+    fe_glyph_t undo_stack[FE_UNDO_DEPTH];
+    int undo_top;   /* next write slot (circular) */
+    int undo_count; /* number of valid entries */
+    fe_selection_t sel_first;
+    fe_selection_t sel_last;
+    iui_rect_t canvas_rect;
+    int prev_char; /* track character changes to re-parse */
+    bool moving;   /* true during arrow-key moves for undo coalescing */
+} fe_state_t;
+
+/* Parse glyph bytecode into editable fe_glyph_t */
+static void fe_parse_glyph(fe_glyph_t *g, int char_code)
+{
+    const signed char *raw = iui_get_glyph((unsigned char) char_code);
+
+    g->left = IUI_GLYPH_LEFT(raw);
+    g->right = IUI_GLYPH_RIGHT(raw);
+    g->ascent = IUI_GLYPH_ASCENT(raw);
+    g->descent = IUI_GLYPH_DESCENT(raw);
+    g->n_ops = 0;
+    g->n_points = 0;
+
+    const signed char *it = IUI_GLYPH_DRAW(raw);
+    for (;;) {
+        signed char op = *it++;
+        if (g->n_ops >= FE_MAX_OPS)
+            break;
+        switch (op) {
+        case 'm':
+            if (g->n_points + 1 > FE_MAX_POINTS)
+                return;
+            g->ops[g->n_ops].type = FE_OP_MOVE;
+            g->ops[g->n_ops].n_pts = 1;
+            g->ops[g->n_ops].pt_start = g->n_points;
+            g->points[g->n_points].x = (float) it[0];
+            g->points[g->n_points].y = (float) it[1];
+            g->n_points++;
+            g->n_ops++;
+            it += 2;
+            break;
+        case 'l':
+            if (g->n_points + 1 > FE_MAX_POINTS)
+                return;
+            g->ops[g->n_ops].type = FE_OP_LINE;
+            g->ops[g->n_ops].n_pts = 1;
+            g->ops[g->n_ops].pt_start = g->n_points;
+            g->points[g->n_points].x = (float) it[0];
+            g->points[g->n_points].y = (float) it[1];
+            g->n_points++;
+            g->n_ops++;
+            it += 2;
+            break;
+        case 'c':
+            if (g->n_points + 3 > FE_MAX_POINTS)
+                return;
+            g->ops[g->n_ops].type = FE_OP_CURVE;
+            g->ops[g->n_ops].n_pts = 3;
+            g->ops[g->n_ops].pt_start = g->n_points;
+            g->points[g->n_points].x = (float) it[0];
+            g->points[g->n_points].y = (float) it[1];
+            g->points[g->n_points + 1].x = (float) it[2];
+            g->points[g->n_points + 1].y = (float) it[3];
+            g->points[g->n_points + 2].x = (float) it[4];
+            g->points[g->n_points + 2].y = (float) it[5];
+            g->n_points += 3;
+            g->n_ops++;
+            it += 6;
+            break;
+        case 'e':
+            return;
+        default:
+            return;
+        }
+    }
+}
+
+static void fe_push_undo(fe_state_t *st)
+{
+    memcpy(&st->undo_stack[st->undo_top], &st->glyph, sizeof(fe_glyph_t));
+    st->undo_top = (st->undo_top + 1) % FE_UNDO_DEPTH;
+    if (st->undo_count < FE_UNDO_DEPTH)
+        st->undo_count++;
+}
+
+static void fe_pop_undo(fe_state_t *st)
+{
+    if (st->undo_count <= 0)
+        return;
+    st->undo_top = (st->undo_top - 1 + FE_UNDO_DEPTH) % FE_UNDO_DEPTH;
+    st->undo_count--;
+    memcpy(&st->glyph, &st->undo_stack[st->undo_top], sizeof(fe_glyph_t));
+    st->sel_first.op_idx = -1;
+    st->sel_first.pt_idx = -1;
+    st->sel_last.op_idx = -1;
+    st->sel_last.pt_idx = -1;
+}
+
+/* Compute canvas origin: baseline sits so that the full glyph
+ * (ascent above, descent below) is centered vertically in the canvas.
+ * Horizontally, center the glyph width (left..right) in the canvas.
+ */
+static void fe_canvas_origin(const fe_state_t *st, float *ox, float *oy)
+{
+    float cw = st->canvas_rect.width;
+    float ch = st->canvas_rect.height;
+    float asc = (float) st->glyph.ascent;
+    float desc = (float) st->glyph.descent;
+    float left = (float) st->glyph.left;
+    float right = (float) st->glyph.right;
+    float glyph_h = (asc - desc) * st->zoom; /* total pixel height */
+    float glyph_w = (right - left) * st->zoom;
+    float margin = 20.0f;
+
+    /* Baseline Y: position so ascent..descent block is centered */
+    float top_y = (ch - glyph_h) * 0.5f + margin * 0.5f;
+    if (top_y < margin)
+        top_y = margin;
+    *oy = st->canvas_rect.y + top_y + asc * st->zoom;
+
+    /* Origin X: center glyph width */
+    *ox = st->canvas_rect.x + (cw - glyph_w) * 0.5f - left * st->zoom;
+}
+
+/* Screen coords to glyph coords */
+static void fe_screen_to_glyph(const fe_state_t *st,
+                               float sx,
+                               float sy,
+                               float *gx,
+                               float *gy)
+{
+    float origin_x, origin_y;
+    fe_canvas_origin(st, &origin_x, &origin_y);
+    *gx = (sx - origin_x) / st->zoom;
+    *gy = (sy - origin_y) / st->zoom;
+}
+
+/* Find nearest point to given glyph coordinates; returns point index or -1 */
+static int fe_hit_test(const fe_state_t *st, float gx, float gy, int *out_op)
+{
+    float threshold = 5.0f; /* glyph units */
+    float best_dist = threshold * threshold;
+    int best_pt = -1;
+    int best_op = -1;
+
+    for (int i = 0; i < st->glyph.n_ops; i++) {
+        const fe_op_t *op = &st->glyph.ops[i];
+        for (int j = 0; j < op->n_pts; j++) {
+            int pi = op->pt_start + j;
+            float dx = st->glyph.points[pi].x - gx;
+            float dy = st->glyph.points[pi].y - gy;
+            float d2 = dx * dx + dy * dy;
+            if (d2 < best_dist) {
+                best_dist = d2;
+                best_pt = pi;
+                best_op = i;
+            }
+        }
+    }
+    if (out_op)
+        *out_op = best_op;
+    return best_pt;
+}
+
+/* Draw grid lines on canvas background */
+static void fe_draw_canvas_bg(iui_context *ui, const fe_state_t *st)
+{
+    const iui_theme_t *theme = iui_get_theme(ui);
+    iui_rect_t cr = st->canvas_rect;
+    float ox, oy;
+    fe_canvas_origin(st, &ox, &oy);
+    float z = st->zoom;
+
+    /* Canvas background */
+    ui->renderer.draw_box(cr, 0, theme->surface_container, ui->renderer.user);
+
+    /* Pre-compute screen-space bounds for grid extent */
+    float sy_top = oy + -64.0f * z;
+    float sy_bot = oy + 20.0f * z;
+    float sx_left = ox + -80.0f * z;
+    float sx_right = ox + 80.0f * z;
+    float cr_right = cr.x + cr.width;
+    float cr_bottom = cr.y + cr.height;
+
+    /* Grid lines at 10-unit glyph intervals */
+    uint32_t grid_color = (theme->outline_variant & 0x00FFFFFF) | 0x30000000;
+    float step = 10.0f;
+    /* Vertical grid lines */
+    for (float gx = -80.0f; gx <= 80.0f; gx += step) {
+        float sx = ox + gx * z;
+        if (sx >= cr.x && sx <= cr_right)
+            iui_draw_line(ui, sx, fmaxf(sy_top, cr.y), sx,
+                          fminf(sy_bot, cr_bottom), 1.0f, grid_color);
+    }
+    /* Horizontal grid lines */
+    for (float gy = -60.0f; gy <= 20.0f; gy += step) {
+        float sy = oy + gy * z;
+        if (sy >= cr.y && sy <= cr_bottom)
+            iui_draw_line(ui, fmaxf(sx_left, cr.x), sy,
+                          fminf(sx_right, cr_right), sy, 1.0f, grid_color);
+    }
+
+    /* Baseline (y=0) in red */
+    if (oy >= cr.y && oy <= cr_bottom)
+        iui_draw_line(ui, fmaxf(sx_left, cr.x), oy, fminf(sx_right, cr_right),
+                      oy, 1.5f, 0xFFCC3333);
+
+    /* Ascent line in blue */
+    if (st->glyph.ascent != 0) {
+        float sy = oy + (float) -st->glyph.ascent * z;
+        if (sy >= cr.y && sy <= cr_bottom)
+            iui_draw_line(ui, fmaxf(sx_left, cr.x), sy,
+                          fminf(sx_right, cr_right), sy, 1.0f, 0xFF3366CC);
+    }
+
+    /* Descent line in blue */
+    if (st->glyph.descent != 0) {
+        float sy = oy + (float) -st->glyph.descent * z;
+        if (sy >= cr.y && sy <= cr_bottom)
+            iui_draw_line(ui, fmaxf(sx_left, cr.x), sy,
+                          fminf(sx_right, cr_right), sy, 1.0f, 0xFF3366CC);
+    }
+
+    /* Left bearing in green */
+    {
+        float sx = ox + (float) st->glyph.left * z;
+        if (sx >= cr.x && sx <= cr_right)
+            iui_draw_line(ui, sx, fmaxf(sy_top, cr.y), sx,
+                          fminf(sy_bot, cr_bottom), 1.0f, 0xFF33AA33);
+    }
+
+    /* Right bearing in green */
+    {
+        float sx = ox + (float) st->glyph.right * z;
+        if (sx >= cr.x && sx <= cr_right)
+            iui_draw_line(ui, sx, fmaxf(sy_top, cr.y), sx,
+                          fminf(sy_bot, cr_bottom), 1.0f, 0xFF33AA33);
+    }
+}
+
+/* Render the glyph path using line segments (flatten beziers) */
+static void fe_draw_glyph_path(iui_context *ui, const fe_state_t *st)
+{
+    const fe_glyph_t *g = &st->glyph;
+    const iui_theme_t *theme = iui_get_theme(ui);
+    uint32_t path_color = theme->on_surface;
+    float ox, oy;
+    fe_canvas_origin(st, &ox, &oy);
+    float z = st->zoom;
+    float pen_x = 0, pen_y = 0;
+
+    for (int i = 0; i < g->n_ops; i++) {
+        const fe_op_t *op = &g->ops[i];
+        const fe_point_t *pts = &g->points[op->pt_start];
+
+        switch (op->type) {
+        case FE_OP_MOVE:
+            pen_x = pts[0].x;
+            pen_y = pts[0].y;
+            break;
+        case FE_OP_LINE: {
+            float sx0 = ox + pen_x * z, sy0 = oy + pen_y * z;
+            float sx1 = ox + pts[0].x * z, sy1 = oy + pts[0].y * z;
+            iui_draw_line(ui, sx0, sy0, sx1, sy1, 1.5f, path_color);
+            pen_x = pts[0].x;
+            pen_y = pts[0].y;
+            break;
+        }
+        case FE_OP_CURVE: {
+            float x0 = pen_x, y0 = pen_y;
+            float x1 = pts[0].x, y1 = pts[0].y;
+            float x2 = pts[1].x, y2 = pts[1].y;
+            float x3 = pts[2].x, y3 = pts[2].y;
+            int segments = 16;
+            float inv = 1.0f / (float) segments;
+            float prev_sx = ox + x0 * z, prev_sy = oy + y0 * z;
+            for (int s = 1; s <= segments; s++) {
+                float t = (float) s * inv;
+                float u = 1.0f - t;
+                float bx = u * u * u * x0 + 3 * u * u * t * x1 +
+                           3 * u * t * t * x2 + t * t * t * x3;
+                float by = u * u * u * y0 + 3 * u * u * t * y1 +
+                           3 * u * t * t * y2 + t * t * t * y3;
+                float cur_sx = ox + bx * z, cur_sy = oy + by * z;
+                iui_draw_line(ui, prev_sx, prev_sy, cur_sx, cur_sy, 1.5f,
+                              path_color);
+                prev_sx = cur_sx;
+                prev_sy = cur_sy;
+            }
+            pen_x = x3;
+            pen_y = y3;
+            break;
+        }
+        }
+    }
+}
+
+/* Draw a control point; enlarged with white ring when selected */
+static void fe_draw_point(iui_context *ui,
+                          const fe_state_t *st,
+                          float sx,
+                          float sy,
+                          int pt_idx,
+                          uint32_t color)
+{
+    bool selected =
+        (st->sel_first.pt_idx == pt_idx) || (st->sel_last.pt_idx == pt_idx);
+    if (selected)
+        iui_draw_circle(ui, sx, sy, 6.0f, color, 0xFFFFFFFF, 2.0f);
+    else
+        iui_draw_circle(ui, sx, sy, 4.0f, color, 0, 0);
+}
+
+/* Draw control points with color coding */
+static void fe_draw_control_points(iui_context *ui, const fe_state_t *st)
+{
+    const fe_glyph_t *g = &st->glyph;
+    float ox, oy;
+    fe_canvas_origin(st, &ox, &oy);
+    float z = st->zoom;
+
+    /* Colors: move=yellow, line=red, curve ctrl=blue, curve end=green */
+    uint32_t col_move = 0xFFCCCC00;
+    uint32_t col_line = 0xFFCC3333;
+    uint32_t col_ctrl = 0xFF3366CC;
+    uint32_t col_end = 0xFF33AA33;
+    uint32_t col_handle = 0x80888888;
+
+    for (int i = 0; i < g->n_ops; i++) {
+        const fe_op_t *op = &g->ops[i];
+        const fe_point_t *pts = &g->points[op->pt_start];
+
+        if (op->type == FE_OP_CURVE) {
+            /* Find pen position from previous op's endpoint */
+            float pen_gx = 0, pen_gy = 0;
+            if (i > 0) {
+                const fe_op_t *prev = &g->ops[i - 1];
+                int last_pt = prev->pt_start + prev->n_pts - 1;
+                pen_gx = g->points[last_pt].x;
+                pen_gy = g->points[last_pt].y;
+            }
+            float sx_pen = ox + pen_gx * z, sy_pen = oy + pen_gy * z;
+            float sx_c0 = ox + pts[0].x * z, sy_c0 = oy + pts[0].y * z;
+            float sx_c1 = ox + pts[1].x * z, sy_c1 = oy + pts[1].y * z;
+            float sx_end = ox + pts[2].x * z, sy_end = oy + pts[2].y * z;
+
+            /* Handle lines */
+            iui_draw_line(ui, sx_pen, sy_pen, sx_c0, sy_c0, 1.0f, col_handle);
+            iui_draw_line(ui, sx_end, sy_end, sx_c1, sy_c1, 1.0f, col_handle);
+
+            fe_draw_point(ui, st, sx_c0, sy_c0, op->pt_start, col_ctrl);
+            fe_draw_point(ui, st, sx_c1, sy_c1, op->pt_start + 1, col_ctrl);
+            fe_draw_point(ui, st, sx_end, sy_end, op->pt_start + 2, col_end);
+        } else {
+            uint32_t col = (op->type == FE_OP_MOVE) ? col_move : col_line;
+            float sx = ox + pts[0].x * z, sy = oy + pts[0].y * z;
+            fe_draw_point(ui, st, sx, sy, op->pt_start, col);
+        }
+    }
+}
+
+/* Draw clickable ASCII grid (0x20..0x7E).
+ * Dynamically fits columns to window width for consistent layout.
+ */
+static void fe_draw_char_grid(iui_context *ui, fe_state_t *st)
+{
+    const iui_theme_t *theme = iui_get_theme(ui);
+    int start_char = 0x20;
+    int end_char = 0x7E;
+    int total_chars = end_char - start_char + 1; /* 95 printable chars */
+    float cell_h = 14.0f;
+
+    /* Determine column count from current layout width */
+    float avail_w = ui->layout.width;
+    if (avail_w < 40.0f)
+        avail_w = 300.0f;
+    float cell_w = 13.0f;
+    int cols = (int) (avail_w / cell_w);
+    if (cols < 10)
+        cols = 10;
+    if (cols > 32)
+        cols = 32;
+
+    int rows = (total_chars + cols - 1) / cols;
+    float total_h = (float) rows * cell_h;
+
+    iui_row(ui, 1, (float[]) {-1.f}, total_h);
+    iui_rect_t area = iui_layout_next(ui);
+
+    /* Recompute cell_w to fill the allocated width evenly */
+    cell_w = area.width / (float) cols;
+
+    for (int ch = start_char; ch <= end_char; ch++) {
+        int idx = ch - start_char;
+        int col = idx % cols;
+        int row = idx / cols;
+        iui_rect_t cell = {area.x + (float) col * cell_w,
+                           area.y + (float) row * cell_h, cell_w, cell_h};
+
+        /* Highlight selected character */
+        if (ch == st->selected_char)
+            ui->renderer.draw_box(cell, 2.0f, theme->primary_container,
+                                  ui->renderer.user);
+
+        /* Draw character label */
+        char label[2] = {(char) ch, '\0'};
+        float tw = iui_text_width_vec(label, ui->font_height);
+        float tx = cell.x + (cell_w - tw) * 0.5f;
+        float ty = cell.y + (cell_h - ui->font_height) * 0.5f;
+        iui_draw_text_vec(ui, tx, ty, label,
+                          ch == st->selected_char ? theme->on_primary_container
+                                                  : theme->on_surface);
+
+        /* Hit test for mouse click */
+        float mx = ui->mouse_pos.x, my = ui->mouse_pos.y;
+        if ((ui->mouse_pressed & IUI_MOUSE_LEFT) && mx >= cell.x &&
+            mx < cell.x + cell.width && my >= cell.y &&
+            my < cell.y + cell.height) {
+            st->selected_char = ch;
+        }
+    }
+}
+
+/* Draw compact operation list -- show selected op's neighborhood */
+static void fe_draw_op_list(iui_context *ui, const fe_state_t *st)
+{
+    const fe_glyph_t *g = &st->glyph;
+    static const char *tn[] = {"m", "l", "c"};
+    int max_show = 4;
+
+    /* Center the view around the selected op if possible */
+    int center = st->sel_first.op_idx >= 0 ? st->sel_first.op_idx : 0;
+    int start = center - max_show / 2;
+    if (start < 0)
+        start = 0;
+    int end = start + max_show;
+    if (end > g->n_ops)
+        end = g->n_ops;
+
+    for (int i = start; i < end; i++) {
+        const fe_op_t *op = &g->ops[i];
+        const fe_point_t *pts = &g->points[op->pt_start];
+        bool is_sel = (st->sel_first.op_idx == i) || (st->sel_last.op_idx == i);
+        const char *type_str = (unsigned) op->type < 3 ? tn[op->type] : "?";
+
+        if (op->type == FE_OP_CURVE) {
+            iui_text_body_small(
+                ui, IUI_ALIGN_LEFT, "%s%d:%s(%.0f,%.0f %.0f,%.0f %.0f,%.0f)",
+                is_sel ? ">" : " ", i, type_str, pts[0].x, pts[0].y, pts[1].x,
+                pts[1].y, pts[2].x, pts[2].y);
+        } else {
+            iui_text_body_small(ui, IUI_ALIGN_LEFT, "%s%d:%s(%.0f,%.0f)",
+                                is_sel ? ">" : " ", i, type_str, pts[0].x,
+                                pts[0].y);
+        }
+    }
+    if (g->n_ops > max_show)
+        iui_text_body_small(ui, IUI_ALIGN_LEFT, "  [%d/%d ops]", end, g->n_ops);
+}
+
+/* Handle mouse clicks on the canvas for point selection */
+static void fe_handle_mouse(iui_context *ui, fe_state_t *st)
+{
+    float mx = ui->mouse_pos.x, my = ui->mouse_pos.y;
+    iui_rect_t cr = st->canvas_rect;
+
+    /* Check mouse within canvas */
+    if (mx < cr.x || mx > cr.x + cr.width || my < cr.y || my > cr.y + cr.height)
+        return;
+
+    if (ui->mouse_pressed & IUI_MOUSE_LEFT) {
+        st->moving = false;
+        float gx, gy;
+        fe_screen_to_glyph(st, mx, my, &gx, &gy);
+        int op_idx = -1;
+        int pt_idx = fe_hit_test(st, gx, gy, &op_idx);
+        st->sel_first.op_idx = op_idx;
+        st->sel_first.pt_idx = pt_idx;
+    }
+
+    if (ui->mouse_pressed & IUI_MOUSE_RIGHT) {
+        st->moving = false;
+        float gx, gy;
+        fe_screen_to_glyph(st, mx, my, &gx, &gy);
+        int op_idx = -1;
+        int pt_idx = fe_hit_test(st, gx, gy, &op_idx);
+        st->sel_last.op_idx = op_idx;
+        st->sel_last.pt_idx = pt_idx;
+    }
+}
+
+/* Handle keyboard input for point movement and undo */
+static void fe_handle_keys(iui_context *ui, fe_state_t *st)
+{
+    int key = ui->key_pressed;
+    if (key == 0) {
+        st->moving = false;
+        return;
+    }
+
+    /* 'u' = undo */
+    if (key == 'u' || key == 'U') {
+        st->moving = false;
+        fe_pop_undo(st);
+        return;
+    }
+
+    /* Escape = clear selection */
+    if (key == IUI_KEY_ESCAPE) {
+        st->moving = false;
+        st->sel_first.op_idx = -1;
+        st->sel_first.pt_idx = -1;
+        st->sel_last.op_idx = -1;
+        st->sel_last.pt_idx = -1;
+        return;
+    }
+
+    /* Arrow keys move selected point */
+    if (st->sel_first.pt_idx < 0)
+        return;
+
+    float dx = 0, dy = 0;
+    if (key == IUI_KEY_LEFT)
+        dx = -1.0f;
+    else if (key == IUI_KEY_RIGHT)
+        dx = 1.0f;
+    else if (key == IUI_KEY_UP)
+        dy = -1.0f;
+    else if (key == IUI_KEY_DOWN)
+        dy = 1.0f;
+    else
+        return;
+
+    /* Coalesce consecutive arrow moves into a single undo entry */
+    if (!st->moving)
+        fe_push_undo(st);
+    st->moving = true;
+    int pi = st->sel_first.pt_idx;
+    st->glyph.points[pi].x += dx;
+    st->glyph.points[pi].y += dy;
+
+    /* Shift + arrow: also move paired control point in curves */
+    if (ui->modifiers & IUI_MOD_SHIFT) {
+        int oi = st->sel_first.op_idx;
+        if (oi >= 0 && st->glyph.ops[oi].type == FE_OP_CURVE) {
+            int base = st->glyph.ops[oi].pt_start;
+            int offset = pi - base;
+            /* cp1 (offset 0) pairs with cp2 (offset 1) */
+            int pair = -1;
+            if (offset == 0)
+                pair = base + 1;
+            else if (offset == 1)
+                pair = base;
+            if (pair >= 0 && pair < st->glyph.n_points) {
+                st->glyph.points[pair].x += dx;
+                st->glyph.points[pair].y += dy;
+            }
+        }
+    }
+}
+
+static void draw_font_editor_window(iui_context *ui)
+{
+    static fe_state_t st = {
+        .selected_char = 'A',
+        .zoom = 4.0f,
+        .undo_top = 0,
+        .undo_count = 0,
+        .sel_first = {-1, -1},
+        .sel_last = {-1, -1},
+        .prev_char = -1,
+        .moving = false,
+    };
+
+    /* Re-parse glyph when character changes */
+    if (st.selected_char != st.prev_char) {
+        fe_parse_glyph(&st.glyph, st.selected_char);
+        st.prev_char = st.selected_char;
+        st.sel_first.op_idx = -1;
+        st.sel_first.pt_idx = -1;
+        st.sel_last.op_idx = -1;
+        st.sel_last.pt_idx = -1;
+        st.undo_top = 0;
+        st.undo_count = 0;
+        st.moving = false;
+    }
+
+    iui_begin_window(ui, "Font Editor", 380, 30, 460, 580,
+                     IUI_WINDOW_RESIZABLE);
+
+    /* Row 1: Prev/Next + character info */
+    iui_grid_begin(ui, 3, 50.f, 24, 4.f);
+    if (iui_button(ui, "Prev", IUI_ALIGN_CENTER)) {
+        st.selected_char--;
+        if (st.selected_char < 0x20)
+            st.selected_char = 0x7E;
+    }
+    iui_grid_next(ui);
+    if (iui_button(ui, "Next", IUI_ALIGN_CENTER)) {
+        st.selected_char++;
+        if (st.selected_char > 0x7E)
+            st.selected_char = 0x20;
+    }
+    iui_grid_next(ui);
+    iui_text_body_small(ui, IUI_ALIGN_LEFT, "'%c' 0x%02X L:%d R:%d",
+                        st.selected_char >= 32 && st.selected_char <= 126
+                            ? (char) st.selected_char
+                            : '?',
+                        st.selected_char, st.glyph.left, st.glyph.right);
+    iui_grid_end(ui);
+
+    /* Row 2: ASCII character grid */
+    fe_draw_char_grid(ui, &st);
+
+    /* Row 3: Zoom slider */
+    iui_slider(ui, "Zoom", 2.0f, 12.0f, 0.5f, &st.zoom, "%.1f");
+
+    /* Row 4: Canvas -- dominant element, fills remaining space */
+    float canvas_h = 280.0f;
+    iui_row(ui, 1, (float[]) {-1.f}, canvas_h);
+    st.canvas_rect = iui_layout_next(ui);
+
+    iui_push_clip(ui, st.canvas_rect);
+    fe_draw_canvas_bg(ui, &st);
+    fe_draw_glyph_path(ui, &st);
+    fe_draw_control_points(ui, &st);
+    iui_pop_clip(ui);
+
+    /* Handle mouse and keyboard interaction */
+    fe_handle_mouse(ui, &st);
+    fe_handle_keys(ui, &st);
+
+    /* Row 5: Compact info bar */
+    iui_divider(ui);
+    fe_draw_op_list(ui, &st);
+    iui_text_body_small(ui, IUI_ALIGN_LEFT,
+                        "A:%d D:%d  Click=sel  Arrows=move  U=undo",
+                        st.glyph.ascent, st.glyph.descent);
+
+    iui_end_window(ui);
+}
+#endif /* CONFIG_DEMO_FONT_EDITOR */
+
 /* Motion System Demo */
 
 #ifdef CONFIG_DEMO_MOTION
@@ -2179,6 +2867,9 @@ typedef struct {
 #ifdef CONFIG_DEMO_ACCESSIBILITY
     bool show_accessibility;
 #endif
+#ifdef CONFIG_DEMO_FONT_EDITOR
+    bool show_font_editor;
+#endif
 #ifdef CONFIG_FEATURE_THEME
     bool dark_mode;
 #endif
@@ -2443,6 +3134,12 @@ static void example_frame(void *arg)
         demo_close_other_windows(state, &state->show_accessibility);
     iui_grid_next(ui);
 #endif
+#ifdef CONFIG_DEMO_FONT_EDITOR
+    if (iui_switch(ui, "Font Editor", &state->show_font_editor, NULL, NULL) &&
+        state->show_font_editor)
+        demo_close_other_windows(state, &state->show_font_editor);
+    iui_grid_next(ui);
+#endif
 #ifdef CONFIG_FEATURE_THEME
     if (iui_switch(ui, "Dark mode", &state->dark_mode, NULL, NULL)) {
         iui_set_theme(ui,
@@ -2535,6 +3232,10 @@ static void example_frame(void *arg)
 #ifdef CONFIG_DEMO_ACCESSIBILITY
     if (state->show_accessibility)
         draw_accessibility_window(ui);
+#endif
+#ifdef CONFIG_DEMO_FONT_EDITOR
+    if (state->show_font_editor)
+        draw_font_editor_window(ui);
 #endif
 #ifdef CONFIG_MODULE_INPUT
     if (state->show_textfield_demo)
