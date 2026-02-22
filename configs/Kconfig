@@ -331,6 +331,15 @@ config DEMO_THEME
       Displays all theme colors with elevation levels.
       Demonstrates light/dark theme differences.
 
+config DEMO_FONT_EDITOR
+    bool "Font Editor Demo"
+    default y
+    depends on DEMO_EXAMPLE && MODULE_INPUT && FEATURE_VECTOR
+    help
+      Glyph editor for vector font data.
+      Displays and renders glyphs from glyphs-data.inc.
+      Demonstrates point editing and curve visualization.
+
 endmenu
 
 # Build Options
