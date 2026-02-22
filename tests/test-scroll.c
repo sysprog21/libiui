@@ -193,8 +193,8 @@ static void test_scroll_update_input(void)
     iui_begin_frame(ctx, 0.016f);
     iui_begin_window(ctx, "test", 10, 10, 400, 300, 0);
 
-    const iui_rect_t *layout = iui_layout_get_current(ctx);
-    float viewport_x = layout->x + 100.f, viewport_y = layout->y + 75.f;
+    iui_rect_t layout = iui_get_layout_rect(ctx);
+    float viewport_x = layout.x + 100.f, viewport_y = layout.y + 75.f;
     iui_update_mouse_pos(ctx, viewport_x, viewport_y);
 
     iui_scroll_begin(ctx, &scroll, 200.f, 150.f);

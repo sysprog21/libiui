@@ -255,12 +255,14 @@ static void test_widgets_outside_window(void)
     iui_grid_next(ctx);
     iui_grid_end(ctx);
 
-    iui_row(ctx, 2, NULL, 30.0f);
-    iui_layout_next(ctx);
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 2, .cross = 30.0f});
+    iui_box_next(ctx);
+    iui_box_end(ctx);
 
-    iui_flex(ctx, 2, NULL, 30.0f, 4.0f);
-    iui_flex_next(ctx);
-    iui_flex_end(ctx);
+    iui_box_begin(ctx, &(iui_box_config_t) {
+                           .child_count = 2, .cross = 30.0f, .gap = 4.0f});
+    iui_box_next(ctx);
+    iui_box_end(ctx);
 
     iui_end_frame(ctx);
 

@@ -261,31 +261,24 @@ typedef struct {
 } iui_clip_rect;
 
 typedef struct {
-    int cols, current_col;  /* number of columns, current column index */
-    float cell_w, cell_h;   /* cell width and height */
-    float pad;              /* padding between cells */
-    float start_x, start_y; /* starting position */
+    int cols, current_col;   /* number of columns, current column index */
+    float cell_w, cell_h;    /* cell width and height */
+    float pad;               /* padding between cells */
+    float start_x, start_y;  /* starting position */
+    iui_rect_t saved_layout; /* parent layout to restore */
+    float saved_row_height;  /* row_height before grid overwrite */
 } iui_grid_state;
 
 typedef struct {
-    float widths[IUI_MAX_ROW_ITEMS];
-    int item_count, item_index; /* number of items, current item index */
-    float height;               /* row height */
-    float start_x;              /* starting x position */
-    float next_row_y;           /* y position for next row */
-} iui_row_state;
-
-typedef struct {
-    float sizes[IUI_MAX_FLEX_ITEMS]; /* computed sizes after layout */
-    float start_x, start_y;          /* container origin */
-    float container_main;            /* container size on main axis */
-    float cross, gap, next_pos; /* size on cross axis, spacing between items,
-                                   next item position on main axis */
-    int count, index;           /* total items, current item index */
-    bool is_column;             /* true=column, false=row */
-    /* saved layout state for restoration */
-    iui_rect_t saved_layout;
-} iui_flex_state;
+    iui_box_config_t config;
+    float origin_x, origin_y;             /* content area origin */
+    float content_w, content_h;           /* available content area */
+    float computed[IUI_MAX_BOX_CHILDREN]; /* resolved main-axis sizes */
+    int child_index;                      /* current child */
+    float next_pos;                       /* cursor along main axis */
+    float resolved_cross;                 /* cross-axis size used at begin */
+    iui_rect_t saved_layout;              /* parent layout to restore */
+} iui_box_entry_t;
 
 /* Performance optimization structures */
 
@@ -416,14 +409,14 @@ struct iui_context {
     int focus_count, focus_index, focus_navigation_direction;
 
     /* COOL PATH - Layout Systems */
-    iui_row_state row;
     iui_grid_state grid;
-    iui_flex_state flex;
+    iui_box_entry_t box_stack[IUI_MAX_BOX_DEPTH];
+    int box_depth; /* 0 = no active box */
     float
         window_content_min_width; /* Max content width requirement this frame */
 
     /* COOL PATH - Layout Mode Flags (grouped to avoid per-struct padding) */
-    bool in_row, in_grid, in_flex, focus_navigation_pending, appbar_active;
+    bool in_grid, focus_navigation_pending, appbar_active;
 
     /* COOL PATH - Widget-Specific State */
     struct {
@@ -1092,8 +1085,6 @@ void iui_process_focus_navigation(iui_context *ctx);
 bool iui_widget_is_focused(const iui_context *ctx, uint32_t id);
 
 /* Layout internal functions (iui_layout.c) */
-
-/* iui_flex_init is static within iui_layout.c */
 
 /* Performance optimization functions (draw.c, layout.c) */
 

@@ -72,29 +72,19 @@ static bool iui_chip_internal(iui_context *ctx,
     /* Compute chip rect from layout */
     iui_rect_t chip_rect;
 
-    if (ctx->in_grid) {
-        /* In grid mode, use cell dimensions but center the chip */
+    if (ctx->box_depth > 0) {
+        /* Box takes priority: left-aligned within box slot */
         chip_rect = (iui_rect_t) {
-            .x = ctx->layout.x + (ctx->layout.width - chip_width) * 0.5f,
+            .x = ctx->layout.x,
             .y = ctx->layout.y + (ctx->layout.height - chip_height) * 0.5f,
             .width = chip_width,
             .height = chip_height,
         };
-    } else if (ctx->in_flex) {
-        /* In flex mode, use layout rect */
-        iui_rect_t flex_rect = iui_flex_next(ctx);
+    } else if (ctx->in_grid) {
+        /* Grid without box: center chip in cell */
         chip_rect = (iui_rect_t) {
-            .x = flex_rect.x,
-            .y = flex_rect.y + (flex_rect.height - chip_height) * 0.5f,
-            .width = chip_width,
-            .height = chip_height,
-        };
-    } else if (ctx->in_row) {
-        /* In row mode, use layout_next */
-        iui_rect_t row_rect = iui_layout_next(ctx);
-        chip_rect = (iui_rect_t) {
-            .x = row_rect.x,
-            .y = row_rect.y + (row_rect.height - chip_height) * 0.5f,
+            .x = ctx->layout.x + (ctx->layout.width - chip_width) * 0.5f,
+            .y = ctx->layout.y + (ctx->layout.height - chip_height) * 0.5f,
             .width = chip_width,
             .height = chip_height,
         };

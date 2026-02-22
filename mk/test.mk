@@ -42,6 +42,7 @@ TEST_SRCS := \
     tests/common.c \
     tests/test-init.c \
     tests/test-layout.c \
+    tests/test-box.c \
     tests/test-theme.c \
     tests/test-state.c \
     tests/test-demo.c \

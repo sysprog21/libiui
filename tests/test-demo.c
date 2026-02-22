@@ -106,35 +106,39 @@ static void demo_grid_layout(iui_context *ctx)
 
 static void demo_row_layout(iui_context *ctx)
 {
-    TEST(demo_row_layout);
+    TEST(demo_box_row_layout);
     reset_counters();
 
     iui_begin_frame(ctx, 1.f / 60.f);
-    iui_begin_window(ctx, "Row Layout", 100, 100, 400, 300, 0);
+    iui_begin_window(ctx, "Box Layout", 100, 100, 400, 300, 0);
 
-    iui_row(ctx, 3, (float[]) {100.f, -1.f, -1.f}, 0);
-    iui_layout_next(ctx);
+    iui_sizing_t row1[] = {IUI_FIXED(100), IUI_GROW(1), IUI_GROW(1)};
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 3, .sizes = row1});
+    iui_box_next(ctx);
     iui_text(ctx, IUI_ALIGN_LEFT, "Label:");
-    iui_layout_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "OK", IUI_ALIGN_CENTER);
-    iui_layout_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "Cancel", IUI_ALIGN_CENTER);
+    iui_box_end(ctx);
 
-    iui_row(ctx, 4, (float[]) {-1.f, -1.f, -1.f, -1.f}, 30.f);
-    iui_layout_next(ctx);
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 4, .cross = 30.f});
+    iui_box_next(ctx);
     iui_button(ctx, "A", IUI_ALIGN_CENTER);
-    iui_layout_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "B", IUI_ALIGN_CENTER);
-    iui_layout_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "C", IUI_ALIGN_CENTER);
-    iui_layout_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "D", IUI_ALIGN_CENTER);
+    iui_box_end(ctx);
 
-    iui_row(ctx, 2, NULL, 0);
-    iui_layout_next(ctx);
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 2});
+    iui_box_next(ctx);
     iui_text(ctx, IUI_ALIGN_LEFT, "Left half");
-    iui_layout_next(ctx);
+    iui_box_next(ctx);
     iui_text(ctx, IUI_ALIGN_RIGHT, "Right half");
+    iui_box_end(ctx);
 
     iui_end_window(ctx);
     iui_end_frame(ctx);
@@ -143,40 +147,49 @@ static void demo_row_layout(iui_context *ctx)
     PASS();
 }
 
-static void demo_flex_layout(iui_context *ctx)
+static void demo_box_layout(iui_context *ctx)
 {
-    TEST(demo_flex_layout);
+    TEST(demo_box_layout);
     reset_counters();
 
     iui_begin_frame(ctx, 1.f / 60.f);
-    iui_begin_window(ctx, "Flex Layout", 100, 100, 400, 400, 0);
+    iui_begin_window(ctx, "Box Layout 2", 100, 100, 400, 400, 0);
 
-    iui_flex(ctx, 3, NULL, 0, 4.f);
-    iui_flex_next(ctx);
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 3, .gap = 4.f});
+    iui_box_next(ctx);
     iui_button(ctx, "A", IUI_ALIGN_CENTER);
-    iui_flex_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "B", IUI_ALIGN_CENTER);
-    iui_flex_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "C", IUI_ALIGN_CENTER);
-    iui_flex_end(ctx);
+    iui_box_end(ctx);
 
-    iui_flex(ctx, 3, (float[]) {-1.f, 100.f, -2.f}, 0, 4.f);
-    iui_flex_next(ctx);
+    iui_sizing_t mixed[] = {IUI_GROW(1), IUI_FIXED(100), IUI_GROW(2)};
+    iui_box_begin(ctx, &(iui_box_config_t) {
+                           .child_count = 3, .sizes = mixed, .gap = 4.f});
+    iui_box_next(ctx);
     iui_button(ctx, "Flex 1", IUI_ALIGN_CENTER);
-    iui_flex_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "Fixed", IUI_ALIGN_CENTER);
-    iui_flex_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "Flex 2", IUI_ALIGN_CENTER);
-    iui_flex_end(ctx);
+    iui_box_end(ctx);
 
-    iui_flex_column(ctx, 3, (float[]) {30.f, -1.f, 30.f}, 120.f, 4.f);
-    iui_flex_next(ctx);
+    iui_sizing_t col[] = {IUI_FIXED(30), IUI_GROW(1), IUI_FIXED(30)};
+    iui_box_begin(ctx, &(iui_box_config_t) {
+                           .direction = IUI_DIR_COLUMN,
+                           .child_count = 3,
+                           .sizes = col,
+                           .cross = 120.f,
+                           .gap = 4.f,
+                       });
+    iui_box_next(ctx);
     iui_button(ctx, "Top", IUI_ALIGN_CENTER);
-    iui_flex_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "Middle", IUI_ALIGN_CENTER);
-    iui_flex_next(ctx);
+    iui_box_next(ctx);
     iui_button(ctx, "Bottom", IUI_ALIGN_CENTER);
-    iui_flex_end(ctx);
+    iui_box_end(ctx);
 
     iui_end_window(ctx);
     iui_end_frame(ctx);
@@ -263,7 +276,7 @@ void run_demo_tests(iui_context *ctx)
     demo_new_widgets(ctx);
     demo_grid_layout(ctx);
     demo_row_layout(ctx);
-    demo_flex_layout(ctx);
+    demo_box_layout(ctx);
     demo_id_stack(ctx);
     demo_theme_switching(ctx);
     SECTION_END();

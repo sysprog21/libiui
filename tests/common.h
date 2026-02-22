@@ -325,5 +325,6 @@ void run_field_tracking_tests(void);
 void run_overflow_tests(void);
 void run_navigation_tests(void);
 void run_bottom_sheet_tests(void);
+void run_box_tests(void);
 
 #endif /* TEST_COMMON_H */

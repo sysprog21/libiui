@@ -157,9 +157,9 @@ static void test_chip_outside_window(void)
     PASS();
 }
 
-static void test_chip_in_flex_layout(void)
+static void test_chip_in_box_layout(void)
 {
-    TEST(chip_in_flex_layout);
+    TEST(chip_in_box_layout);
     void *buffer = malloc(iui_min_memory_size());
     iui_context *ctx = create_test_context(buffer, false);
     ASSERT_NOT_NULL(ctx);
@@ -167,11 +167,15 @@ static void test_chip_in_flex_layout(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
 
-    iui_flex(ctx, 3, (float[]) {-1, -1, -1}, 40, 8);
+    iui_box_begin(
+        ctx, &(iui_box_config_t) {.child_count = 3, .cross = 40, .gap = 8});
+    iui_box_next(ctx);
     iui_chip_assist(ctx, "One", NULL);
+    iui_box_next(ctx);
     iui_chip_assist(ctx, "Two", NULL);
+    iui_box_next(ctx);
     iui_chip_assist(ctx, "Three", NULL);
-    iui_flex_end(ctx);
+    iui_box_end(ctx);
 
     iui_end_window(ctx);
     iui_end_frame(ctx);
@@ -354,7 +358,7 @@ void run_chip_tests(void)
     test_chip_null_context();
     test_chip_null_label();
     test_chip_outside_window();
-    test_chip_in_flex_layout();
+    test_chip_in_box_layout();
     test_chip_outline_fallback();
     /* Interaction tests */
     test_chip_assist_click();

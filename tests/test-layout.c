@@ -1,175 +1,11 @@
 /*
  * Layout System Tests
  *
- * Tests for row, flex, and grid layout systems.
+ * Tests for grid layout, window auto-sizing, and spacing snap.
+ * Box container tests are in test-box.c.
  */
 
 #include "common.h"
-
-/* Row Layout Tests */
-
-static void test_row_null_widths(void)
-{
-    TEST(row_null_widths);
-    void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
-    ASSERT_NOT_NULL(ctx);
-
-    iui_begin_frame(ctx, 1.0f / 60.0f);
-    iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
-
-    iui_row(ctx, 4, NULL, 30.0f);
-
-    iui_rect_t r1 = iui_layout_next(ctx);
-    iui_rect_t r2 = iui_layout_next(ctx);
-    iui_rect_t r3 = iui_layout_next(ctx);
-    iui_rect_t r4 = iui_layout_next(ctx);
-
-    ASSERT_NEAR(r1.width, r2.width, 1.0f);
-    ASSERT_NEAR(r2.width, r3.width, 1.0f);
-    ASSERT_NEAR(r3.width, r4.width, 1.0f);
-
-    iui_end_window(ctx);
-    iui_end_frame(ctx);
-
-    free(buffer);
-    PASS();
-}
-
-static void test_spacing_snap(void)
-{
-    TEST(spacing_snap);
-    float result = iui_spacing_snap(10.3f);
-    /* 10.3 / 4 = 2.575, roundf(2.575) = 3, 3 * 4 = 12 */
-    ASSERT_NEAR(result, 12.0f, 0.001f);
-
-    result = iui_spacing_snap(10.0f);
-    /* 10.0 / 4 = 2.5, roundf(2.5) = 3 (rounds away from zero on halfway), 3 * 4
-     * = 12 */
-    ASSERT_NEAR(result, 12.0f, 0.001f);
-
-    result = iui_spacing_snap(2.0f);
-    /* 2.0 / 4 = 0.5, roundf(0.5) = 1 (rounds away from zero on halfway), 1 * 4
-     * = 4 */
-    ASSERT_NEAR(result, 4.0f, 0.001f);
-
-    PASS();
-}
-
-static void test_row_mixed_widths(void)
-{
-    TEST(row_mixed_widths);
-    void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
-    ASSERT_NOT_NULL(ctx);
-
-    iui_begin_frame(ctx, 1.0f / 60.0f);
-    iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
-
-    float widths[] = {100.0f, -1.0f, -2.0f};
-    iui_row(ctx, 3, widths, 30.0f);
-
-    iui_rect_t r1 = iui_layout_next(ctx);
-    iui_rect_t r2 = iui_layout_next(ctx);
-    iui_rect_t r3 = iui_layout_next(ctx);
-
-    ASSERT_NEAR(r1.width, 100.0f, 1.0f);
-    ASSERT_NEAR(r3.width, r2.width * 2.0f, 2.0f);
-
-    iui_end_window(ctx);
-    iui_end_frame(ctx);
-
-    free(buffer);
-    PASS();
-}
-
-/* Flex Layout Tests */
-
-
-static void test_flex_equal_distribution(void)
-{
-    TEST(flex_equal_distribution);
-    void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
-    ASSERT_NOT_NULL(ctx);
-
-    iui_begin_frame(ctx, 1.0f / 60.0f);
-    iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
-
-    iui_flex(ctx, 3, NULL, 30.0f, 0.0f);
-
-    iui_rect_t r1 = iui_flex_next(ctx);
-    iui_rect_t r2 = iui_flex_next(ctx);
-    iui_rect_t r3 = iui_flex_next(ctx);
-
-    ASSERT_NEAR(r1.width, r2.width, 1.0f);
-    ASSERT_NEAR(r2.width, r3.width, 1.0f);
-
-    iui_flex_end(ctx);
-    iui_end_window(ctx);
-    iui_end_frame(ctx);
-
-    free(buffer);
-    PASS();
-}
-
-static void test_flex_fixed_center(void)
-{
-    TEST(flex_fixed_center);
-    void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
-    ASSERT_NOT_NULL(ctx);
-
-    iui_begin_frame(ctx, 1.0f / 60.0f);
-    iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
-
-    float sizes[] = {-1.0f, 100.0f, -2.0f};
-    iui_flex(ctx, 3, sizes, 30.0f, 0.0f);
-
-    iui_flex_next(ctx);
-    iui_rect_t center = iui_flex_next(ctx);
-    iui_flex_next(ctx);
-
-    ASSERT_NEAR(center.width, 100.0f, 1.0f);
-
-    iui_flex_end(ctx);
-    iui_end_window(ctx);
-    iui_end_frame(ctx);
-
-    free(buffer);
-    PASS();
-}
-
-static void test_flex_column_layout(void)
-{
-    TEST(flex_column_layout);
-    void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
-    ASSERT_NOT_NULL(ctx);
-
-    iui_begin_frame(ctx, 1.0f / 60.0f);
-    iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
-
-    float sizes[] = {30.0f, -1.0f, 30.0f};
-    iui_flex_column(ctx, 3, sizes, 200.0f, 0.0f);
-
-    iui_rect_t top = iui_flex_next(ctx);
-    iui_rect_t middle = iui_flex_next(ctx);
-    iui_rect_t bottom = iui_flex_next(ctx);
-
-    ASSERT_NEAR(top.height, 30.0f, 1.0f);
-    ASSERT_NEAR(bottom.height, 30.0f, 1.0f);
-    ASSERT_TRUE(middle.height > 100.0f);
-    ASSERT_TRUE(middle.y > top.y);
-    ASSERT_TRUE(bottom.y > middle.y);
-
-    iui_flex_end(ctx);
-    iui_end_window(ctx);
-    iui_end_frame(ctx);
-
-    free(buffer);
-    PASS();
-}
 
 /* Grid Layout Tests */
 
@@ -184,11 +20,17 @@ static void test_grid_basic(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
 
-    iui_grid_begin(ctx, 3, 50.0f, 30.0f, 5.0f);
+    iui_rect_t r = iui_grid_begin(ctx, 3, 50.0f, 30.0f, 5.0f);
+    /* First cell should have positive dimensions matching cell size */
+    ASSERT_NEAR(r.width, 50.0f, 0.001f);
+    ASSERT_NEAR(r.height, 30.0f, 0.001f);
 
     for (int i = 0; i < 9; i++) {
         iui_button(ctx, "X", IUI_ALIGN_CENTER);
-        iui_grid_next(ctx);
+        r = iui_grid_next(ctx);
+        /* Each advanced cell should also have cell dimensions */
+        ASSERT_NEAR(r.width, 50.0f, 0.001f);
+        ASSERT_NEAR(r.height, 30.0f, 0.001f);
     }
 
     iui_grid_end(ctx);
@@ -211,7 +53,10 @@ static void test_grid_zero_cols(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
 
-    iui_grid_begin(ctx, 0, 50.0f, 30.0f, 5.0f);
+    /* Zero cols: should return empty rect */
+    iui_rect_t r = iui_grid_begin(ctx, 0, 50.0f, 30.0f, 5.0f);
+    ASSERT_NEAR(r.width, 0.0f, 0.001f);
+    ASSERT_NEAR(r.height, 0.0f, 0.001f);
     iui_grid_next(ctx);
     iui_grid_end(ctx);
 
@@ -336,7 +181,7 @@ static void test_grid_reports_width_requirement(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Grid", 0, 0, 200, 200, IUI_WINDOW_AUTO_SIZE);
 
-    /* 4 cols × 60px + 3 gaps × 5px = 255px required */
+    /* 4 cols x 60px + 3 gaps x 5px = 255px required */
     iui_grid_begin(ctx, 4, 60.0f, 30.0f, 5.0f);
     iui_grid_end(ctx);
 
@@ -351,10 +196,29 @@ static void test_grid_reports_width_requirement(void)
     PASS();
 }
 
-/* Layout Edge Cases */
-static void test_layout_next_outside_row(void)
+static void test_spacing_snap(void)
 {
-    TEST(layout_next_outside_row);
+    TEST(spacing_snap);
+    float result = iui_spacing_snap(10.3f);
+    /* 10.3 / 4 = 2.575, roundf(2.575) = 3, 3 * 4 = 12 */
+    ASSERT_NEAR(result, 12.0f, 0.001f);
+
+    result = iui_spacing_snap(10.0f);
+    /* 10.0 / 4 = 2.5, roundf(2.5) = 3 (rounds away from zero on halfway), 3 * 4
+     * = 12 */
+    ASSERT_NEAR(result, 12.0f, 0.001f);
+
+    result = iui_spacing_snap(2.0f);
+    /* 2.0 / 4 = 0.5, roundf(0.5) = 1 (rounds away from zero on halfway), 1 * 4
+     * = 4 */
+    ASSERT_NEAR(result, 4.0f, 0.001f);
+
+    PASS();
+}
+
+static void test_grid_restores_layout(void)
+{
+    TEST(grid_restores_layout);
     void *buffer = malloc(iui_min_memory_size());
     iui_context *ctx = create_test_context(buffer, false);
     ASSERT_NOT_NULL(ctx);
@@ -362,10 +226,26 @@ static void test_layout_next_outside_row(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
 
-    iui_rect_t r = iui_layout_next(ctx);
+    /* Capture pre-grid layout state */
+    iui_rect_t before = iui_get_layout_rect(ctx);
+    float row_h_before = ctx->row_height;
 
-    ASSERT_TRUE(r.width > 0);
-    ASSERT_TRUE(r.height > 0);
+    ASSERT_TRUE(before.width > 0);
+    ASSERT_TRUE(row_h_before > 0);
+
+    /* Grid with different cell dimensions should NOT clobber parent state */
+    iui_grid_begin(ctx, 2, 80.0f, 40.0f, 4.0f);
+    iui_grid_next(ctx);
+    iui_grid_end(ctx);
+
+    /* After grid: x and width should be restored, y should advance past grid */
+    iui_rect_t after = iui_get_layout_rect(ctx);
+    ASSERT_NEAR(after.x, before.x, 0.001f);
+    ASSERT_NEAR(after.width, before.width, 0.001f);
+    ASSERT_TRUE(after.y > before.y); /* advanced past grid */
+
+    /* row_height should be restored, not hardcoded to font_height * 1.5 */
+    ASSERT_NEAR(ctx->row_height, row_h_before, 0.001f);
 
     iui_end_window(ctx);
     iui_end_frame(ctx);
@@ -378,19 +258,14 @@ static void test_layout_next_outside_row(void)
 void run_layout_tests(void)
 {
     SECTION_BEGIN("Layout System");
-    test_row_null_widths();
-    test_row_mixed_widths();
-    test_flex_equal_distribution();
-    test_flex_fixed_center();
-    test_flex_column_layout();
     test_grid_basic();
     test_grid_zero_cols();
-    test_layout_next_outside_row();
     test_spacing_snap();
     /* Window auto-sizing tests */
     test_window_autosize_expands_to_content();
     test_window_autosize_only_grows();
     test_window_no_autosize_ignores_content_width();
     test_grid_reports_width_requirement();
+    test_grid_restores_layout();
     SECTION_END();
 }

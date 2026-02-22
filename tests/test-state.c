@@ -141,9 +141,9 @@ static void test_unclosed_layout_at_window_end(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);
 
-    iui_row(ctx, 3, NULL, 30.0f);
     iui_grid_begin(ctx, 2, 50.0f, 30.0f, 5.0f);
-    iui_flex(ctx, 2, NULL, 30.0f, 4.0f);
+    iui_box_begin(ctx, &(iui_box_config_t) {
+                           .child_count = 2, .cross = 30.0f, .gap = 4.0f});
 
     iui_end_window(ctx);
     iui_end_frame(ctx);
@@ -226,14 +226,14 @@ static void test_layout_contamination_between_windows(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
 
     iui_begin_window(ctx, "Window1", 0, 0, 200, 200, 0);
-    iui_row(ctx, 3, NULL, 30.0f);
-    iui_layout_next(ctx);
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 3, .cross = 30.0f});
+    iui_box_next(ctx);
+    iui_box_end(ctx);
     iui_end_window(ctx);
 
     iui_begin_window(ctx, "Window2", 250, 0, 200, 200, 0);
-    const iui_rect_t *layout = iui_layout_get_current(ctx);
-    ASSERT_NOT_NULL(layout);
-    ASSERT_TRUE(layout->width > 0);
+    iui_rect_t layout = iui_get_layout_rect(ctx);
+    ASSERT_TRUE(layout.width > 0);
     iui_button(ctx, "Clean State", IUI_ALIGN_CENTER);
     iui_end_window(ctx);
 

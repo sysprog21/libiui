@@ -309,8 +309,8 @@ static void draw_clock_window(iui_context *ui, iui_port_ctx *port)
 {
     iui_begin_window(ui, "Analog Clock", 380, 30, 320, 260,
                      IUI_WINDOW_RESIZABLE);
-    iui_row(ui, 1, (float[]) {-1.f}, 200.f);
-    iui_rect_t rect = iui_layout_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 200.f});
+    iui_rect_t rect = iui_box_next(ui);
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -362,6 +362,7 @@ static void draw_clock_window(iui_context *ui, iui_port_ctx *port)
     iui_draw_circle(ui, cx, cy, 6.f, CLOCK_BORDER, 0, 0);
     iui_draw_circle(ui, cx, cy, 4.f, CLOCK_SECOND, 0, 0);
 
+    iui_box_end(ui);
     iui_end_window(ui);
     (void) port;
 }
@@ -386,8 +387,8 @@ static void draw_vector_demo_window(iui_context *ui, float progress_value)
     const uint32_t COLOR_GRAY = 0xFF455A64;
     const uint32_t COLOR_WHITE = 0xFFFFFFFF;
 
-    iui_row(ui, 1, (float[]) {-1.f}, 220.f);
-    iui_rect_t area = iui_layout_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 220.f});
+    iui_rect_t area = iui_box_next(ui);
 
     /* Multi-ring progress indicator */
     float cx1 = area.x + 55.f;
@@ -536,6 +537,7 @@ static void draw_vector_demo_window(iui_context *ui, float progress_value)
         prev_y = y;
     }
 
+    iui_box_end(ui);
     iui_end_window(ui);
 }
 #endif /* CONFIG_DEMO_VECTOR */
@@ -652,8 +654,8 @@ static void draw_nyancat_window(iui_context *ui, iui_port_ctx *port)
     nyancat_init_frames();
 
     iui_begin_window(ui, "Nyan Cat", 380, 30, 390, 340, IUI_WINDOW_RESIZABLE);
-    iui_row(ui, 1, (float[]) {-1.f}, 280.f);
-    iui_rect_t area = iui_layout_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 280.f});
+    iui_rect_t area = iui_box_next(ui);
 
     float pixel_width = area.width / NYANCAT_FRAME_WIDTH;
     float pixel_height = area.height / NYANCAT_FRAME_HEIGHT;
@@ -693,6 +695,7 @@ static void draw_nyancat_window(iui_context *ui, iui_port_ctx *port)
         }
     }
 
+    iui_box_end(ui);
     (void) port; /* Suppress unused parameter warning */
     iui_end_window(ui);
 }
@@ -711,143 +714,111 @@ static void draw_color_scheme_window(iui_context *ui, iui_port_ctx *port)
 
     /* Primary group */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Primary");
-    iui_grid_begin(ui, 4, sw, sh, 2);
-    iui_rect_t r = iui_layout_next(ui);
+    iui_rect_t r = iui_grid_begin(ui, 4, sw, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->primary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->on_primary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->primary_container);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->on_primary_container);
     iui_grid_end(ui);
 
     /* Secondary group */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Secondary");
-    iui_grid_begin(ui, 4, sw, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 4, sw, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->secondary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->on_secondary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->secondary_container);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->on_secondary_container);
     iui_grid_end(ui);
 
     /* Tertiary group */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Tertiary");
-    iui_grid_begin(ui, 4, sw, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 4, sw, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->tertiary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->on_tertiary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->tertiary_container);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->on_tertiary_container);
     iui_grid_end(ui);
 
     /* Surface elevation */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Surface Elevation");
-    iui_grid_begin(ui, 5, 52, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 5, 52, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->surface_container_lowest);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->surface_container_low);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->surface_container);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->surface_container_high);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->surface_container_highest);
     iui_grid_end(ui);
 
     /* Surface */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Surface");
-    iui_grid_begin(ui, 4, sw, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 4, sw, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->surface);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->on_surface);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->surface_variant);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->on_surface_variant);
     iui_grid_end(ui);
 
     /* Error group */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Error");
-    iui_grid_begin(ui, 4, sw, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 4, sw, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->error);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->on_error);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->error_container);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->on_error_container);
     iui_grid_end(ui);
 
     /* Outline */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Outline");
-    iui_grid_begin(ui, 2, sw * 2, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 2, sw * 2, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->outline);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->outline_variant);
     iui_grid_end(ui);
 
     /* Inverse & Utility */
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "Inverse & Utility");
-    iui_grid_begin(ui, 5, 52, sh, 2);
-    r = iui_layout_next(ui);
+    r = iui_grid_begin(ui, 5, 52, sh, 2);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->inverse_surface);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0,
                           theme->inverse_on_surface);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->inverse_primary);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->shadow);
-    iui_grid_next(ui);
-    r = iui_layout_next(ui);
+    r = iui_grid_next(ui);
     iui_draw_elevated_box(ui, r, 4.f, IUI_ELEVATION_0, theme->scrim);
     iui_grid_end(ui);
 
@@ -916,16 +887,18 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
 
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "FAB");
         iui_rect_t win_rect = iui_get_window_rect(ui);
-        const iui_rect_t *layout = iui_layout_get_current(ui);
-        float fab_y = layout->y + 8.f;
+        iui_rect_t layout = iui_get_layout_rect(ui);
+        float fab_y = layout.y + 8.f;
         float x = win_rect.x + 12.f;
 
         iui_fab(ui, x, fab_y, "add");
         x += 64.f;
         iui_fab_extended(ui, x, fab_y, "compose", "New");
 
-        iui_row(ui, 1, (float[]) {-1}, 64.f);
-        iui_layout_next(ui);
+        iui_box_begin(ui,
+                      &(iui_box_config_t) {.child_count = 1, .cross = 64.f});
+        iui_box_next(ui);
+        iui_box_end(ui);
 #endif /* CONFIG_MODULE_ACTION */
 
     } else if (tab_sel == 1) {
@@ -958,39 +931,58 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
 
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "CHIPS");
 
-        iui_flex(ui, 3, (float[]) {-1, -1, -1}, IUI_CHIP_HEIGHT + 8, 8);
+        iui_box_begin(
+            ui, &(iui_box_config_t) {
+                    .child_count = 3, .cross = IUI_CHIP_HEIGHT + 8, .gap = 8});
+        iui_box_next(ui);
         iui_chip_assist(ui, "Add event", "add");
+        iui_box_next(ui);
         iui_chip_assist(ui, "Settings", "settings");
+        iui_box_next(ui);
         iui_chip_assist(ui, "Search", "search");
-        iui_flex_end(ui);
+        iui_box_end(ui);
 
         static bool filter1 = false, filter2 = true, filter3 = false;
-        iui_flex(ui, 3, (float[]) {-1, -1, -1}, IUI_CHIP_HEIGHT + 8, 8);
+        iui_box_begin(
+            ui, &(iui_box_config_t) {
+                    .child_count = 3, .cross = IUI_CHIP_HEIGHT + 8, .gap = 8});
+        iui_box_next(ui);
         iui_chip_filter(ui, "Active", &filter1);
+        iui_box_next(ui);
         iui_chip_filter(ui, "Pending", &filter2);
+        iui_box_next(ui);
         iui_chip_filter(ui, "Archived", &filter3);
-        iui_flex_end(ui);
+        iui_box_end(ui);
 
         static bool input1_vis = true, input2_vis = true;
         bool input1_removed = false, input2_removed = false;
-        iui_flex(ui, 2, (float[]) {-1, -1}, IUI_CHIP_HEIGHT + 8, 8);
+        iui_box_begin(
+            ui, &(iui_box_config_t) {
+                    .child_count = 2, .cross = IUI_CHIP_HEIGHT + 8, .gap = 8});
+        iui_box_next(ui);
         if (input1_vis) {
             iui_chip_input(ui, "user@mail.com", &input1_removed);
             if (input1_removed)
                 input1_vis = false;
         }
+        iui_box_next(ui);
         if (input2_vis) {
             iui_chip_input(ui, "tag:important", &input2_removed);
             if (input2_removed)
                 input2_vis = false;
         }
-        iui_flex_end(ui);
+        iui_box_end(ui);
 
-        iui_flex(ui, 3, (float[]) {-1, -1, -1}, IUI_CHIP_HEIGHT + 8, 8);
+        iui_box_begin(
+            ui, &(iui_box_config_t) {
+                    .child_count = 3, .cross = IUI_CHIP_HEIGHT + 8, .gap = 8});
+        iui_box_next(ui);
         iui_chip_suggestion(ui, "Try this");
+        iui_box_next(ui);
         iui_chip_suggestion(ui, "Popular");
+        iui_box_next(ui);
         iui_chip_suggestion(ui, "Recent");
-        iui_flex_end(ui);
+        iui_box_end(ui);
 #endif /* CONFIG_MODULE_SELECTION */
 
         iui_divider(ui);
@@ -1012,8 +1004,9 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
                             "Shadow depth increases with level");
 
         uint32_t panel_bg = 0xFFE8E4E0;
-        iui_row(ui, 1, (float[]) {-1.f}, 200.f);
-        iui_rect_t panel = iui_layout_next(ui);
+        iui_box_begin(ui,
+                      &(iui_box_config_t) {.child_count = 1, .cross = 200.f});
+        iui_rect_t panel = iui_box_next(ui);
         iui_draw_elevated_box(ui, panel, 12.f, IUI_ELEVATION_0, panel_bg);
 
         float gx = panel.x + 12.f;
@@ -1029,6 +1022,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
             iui_draw_elevated_box(ui, box, 8.f, (enum iui_elevation) i,
                                   0xFFFFFFFF);
         }
+        iui_box_end(ui);
 
         iui_grid_begin(ui, 3, 115, 20, 4);
         iui_text_body_small(ui, IUI_ALIGN_CENTER, "0: Flat");
@@ -1047,8 +1041,9 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
         iui_divider(ui);
 
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "CARD STYLES");
-        iui_row(ui, 1, (float[]) {-1.f}, 80.f);
-        iui_rect_t cp = iui_layout_next(ui);
+        iui_box_begin(ui,
+                      &(iui_box_config_t) {.child_count = 1, .cross = 80.f});
+        iui_rect_t cp = iui_box_next(ui);
         iui_draw_elevated_box(ui, cp, 12.f, IUI_ELEVATION_0, panel_bg);
 
         float cardw = 100.f, cardh = 45.f, gap = 12.f;
@@ -1062,6 +1057,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
 
         iui_rect_t c3 = {sx + 2 * (cardw + gap), sy, cardw, cardh};
         iui_draw_elevated_box(ui, c3, 8.f, IUI_ELEVATION_0, 0xFFFFFFFF);
+        iui_box_end(ui);
 
         iui_grid_begin(ui, 3, 115, 20, 4);
         iui_text_body_small(ui, IUI_ALIGN_CENTER, "Elevated");
@@ -1149,10 +1145,11 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
 
         /* Badge demo */
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "BADGES");
-        iui_flex(ui, 4, (float[]) {-1, -1, -1, -1}, 50.f, 8);
+        iui_box_begin(ui, &(iui_box_config_t) {
+                              .child_count = 4, .cross = 50.f, .gap = 8});
 
         /* Badge dot */
-        iui_rect_t notif_slot = iui_flex_next(ui);
+        iui_rect_t notif_slot = iui_box_next(ui);
         float notif_cx = notif_slot.x + notif_slot.width * 0.5f;
         float notif_cy = notif_slot.y + notif_slot.height * 0.5f;
         if (iui_icon_button(ui, "notifications"))
@@ -1160,7 +1157,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
         iui_badge_dot(ui, notif_cx + 12.f, notif_cy - 12.f);
 
         /* Badge with count */
-        iui_rect_t mail_slot = iui_flex_next(ui);
+        iui_rect_t mail_slot = iui_box_next(ui);
         float mail_cx = mail_slot.x + mail_slot.width * 0.5f;
         float mail_cy = mail_slot.y + mail_slot.height * 0.5f;
         if (iui_icon_button(ui, "mail"))
@@ -1168,7 +1165,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
         iui_badge_number(ui, mail_cx + 12.f, mail_cy - 12.f, 7, 99);
 
         /* Badge with large count (clamped) */
-        iui_rect_t chat_slot = iui_flex_next(ui);
+        iui_rect_t chat_slot = iui_box_next(ui);
         float chat_cx = chat_slot.x + chat_slot.width * 0.5f;
         float chat_cy = chat_slot.y + chat_slot.height * 0.5f;
         if (iui_icon_button(ui, "chat"))
@@ -1176,14 +1173,14 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
         iui_badge_number(ui, chat_cx + 12.f, chat_cy - 12.f, 150, 99);
 
         /* Badge with count 0 (hidden) */
-        iui_rect_t inbox_slot = iui_flex_next(ui);
+        iui_rect_t inbox_slot = iui_box_next(ui);
         float inbox_cx = inbox_slot.x + inbox_slot.width * 0.5f;
         float inbox_cy = inbox_slot.y + inbox_slot.height * 0.5f;
         if (iui_icon_button(ui, "inbox"))
             (void) 0;
         iui_badge_number(ui, inbox_cx + 12.f, inbox_cy - 12.f, 0, 99);
 
-        iui_flex_end(ui);
+        iui_box_end(ui);
 
         iui_divider(ui);
 
@@ -1764,8 +1761,8 @@ static void fe_draw_char_grid(iui_context *ui, fe_state_t *st)
     int rows = (total_chars + cols - 1) / cols;
     float total_h = (float) rows * cell_h;
 
-    iui_row(ui, 1, (float[]) {-1.f}, total_h);
-    iui_rect_t area = iui_layout_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = total_h});
+    iui_rect_t area = iui_box_next(ui);
 
     /* Recompute cell_w to fill the allocated width evenly */
     cell_w = area.width / (float) cols;
@@ -1799,6 +1796,7 @@ static void fe_draw_char_grid(iui_context *ui, fe_state_t *st)
             st->selected_char = ch;
         }
     }
+    iui_box_end(ui);
 }
 
 /* Draw compact operation list -- show selected op's neighborhood */
@@ -1997,14 +1995,16 @@ static void draw_font_editor_window(iui_context *ui)
 
     /* Row 4: Canvas -- dominant element, fills remaining space */
     float canvas_h = 280.0f;
-    iui_row(ui, 1, (float[]) {-1.f}, canvas_h);
-    st.canvas_rect = iui_layout_next(ui);
+    iui_box_begin(ui,
+                  &(iui_box_config_t) {.child_count = 1, .cross = canvas_h});
+    st.canvas_rect = iui_box_next(ui);
 
     iui_push_clip(ui, st.canvas_rect);
     fe_draw_canvas_bg(ui, &st);
     fe_draw_glyph_path(ui, &st);
     fe_draw_control_points(ui, &st);
     iui_pop_clip(ui);
+    iui_box_end(ui);
 
     /* Handle mouse and keyboard interaction */
     fe_handle_mouse(ui, &st);
@@ -2048,8 +2048,8 @@ static void draw_motion_window(iui_context *ui, float delta_time)
     iui_segmented(ui, easing_names, 4, &easing_sel);
     iui_newline(ui);
 
-    iui_row(ui, 1, (float[]) {-1}, 50.f);
-    iui_rect_t track_area = iui_layout_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 50.f});
+    iui_rect_t track_area = iui_box_next(ui);
 
     float track_y = track_area.y + track_area.height * 0.5f;
     float track_left = track_area.x + 24.f;
@@ -2072,9 +2072,10 @@ static void draw_motion_window(iui_context *ui, float delta_time)
 
     iui_draw_circle(ui, track_left, track_y, 4.f, theme->outline, 0, 0);
     iui_draw_circle(ui, track_right, track_y, 4.f, theme->outline, 0, 0);
+    iui_box_end(ui);
 
-    iui_row(ui, 1, (float[]) {-1}, 160.f);
-    iui_rect_t graph_area = iui_layout_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 160.f});
+    iui_rect_t graph_area = iui_box_next(ui);
 
     float gx = graph_area.x + 20.f;
     float gy = graph_area.y + graph_area.height - 20.f;
@@ -2104,26 +2105,27 @@ static void draw_motion_window(iui_context *ui, float delta_time)
     float dot_x = gx + t * gw;
     float dot_y = gy - eased * gh;
     iui_draw_circle(ui, dot_x, dot_y, 6.f, theme->tertiary, 0, 0);
+    iui_box_end(ui);
 
-    iui_flex(ui, 2, (float[]) {-1, -1}, 0, 8);
-    iui_flex_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 2, .gap = 8});
+    iui_box_next(ui);
     iui_text_body_medium(ui, IUI_ALIGN_CENTER, "t = %.2f", t);
-    iui_flex_next(ui);
+    iui_box_next(ui);
     iui_text_body_medium(ui, IUI_ALIGN_CENTER, "y = %.2f", eased);
-    iui_flex_end(ui);
+    iui_box_end(ui);
 
     iui_newline(ui);
 
-    iui_flex(ui, 2, (float[]) {-1, -1}, 0, 8);
-    iui_flex_next(ui);
+    iui_box_begin(ui, &(iui_box_config_t) {.child_count = 2, .gap = 8});
+    iui_box_next(ui);
     if (iui_filled_button(ui, playing ? "Pause" : "Play", IUI_ALIGN_CENTER)) {
         playing = !playing;
     }
-    iui_flex_next(ui);
+    iui_box_next(ui);
     if (iui_outlined_button(ui, "Reset", IUI_ALIGN_CENTER)) {
         motion_timer = 0.f;
     }
-    iui_flex_end(ui);
+    iui_box_end(ui);
 
     iui_end_window(ui);
 }
@@ -2564,9 +2566,9 @@ static void draw_navigation_demo_window(iui_context *ui)
         iui_newline(ui);
 
         /* Get available area */
-        const iui_rect_t *layout = iui_layout_get_current(ui);
-        float rail_x = layout->x;
-        float rail_y = layout->y + 8.f;
+        iui_rect_t layout = iui_get_layout_rect(ui);
+        float rail_x = layout.x;
+        float rail_y = layout.y + 8.f;
         float rail_height = 320.f;
 
         iui_nav_rail_begin(ui, &rail_state, rail_x, rail_y, rail_height);
@@ -2623,10 +2625,10 @@ static void draw_navigation_demo_window(iui_context *ui)
             iui_newline(ui);
 
         /* Get position for bottom bar */
-        const iui_rect_t *bar_layout = iui_layout_get_current(ui);
-        float bar_x = bar_layout->x;
-        float bar_y = bar_layout->y + 60.f;
-        float bar_width = bar_layout->width;
+        iui_rect_t bar_layout = iui_get_layout_rect(ui);
+        float bar_x = bar_layout.x;
+        float bar_y = bar_layout.y + 60.f;
+        float bar_width = bar_layout.width;
 
         iui_nav_bar_begin(ui, &bar_state, bar_x, bar_y, bar_width, 5);
 
@@ -2676,9 +2678,9 @@ static void draw_navigation_demo_window(iui_context *ui)
                             drawer_state.anim_progress);
 
         /* Get position for drawer (left edge of window) */
-        const iui_rect_t *drawer_layout = iui_layout_get_current(ui);
-        float drawer_x = drawer_layout->x - 8.f;
-        float drawer_y = drawer_layout->y - 200.f;
+        iui_rect_t drawer_layout = iui_get_layout_rect(ui);
+        float drawer_x = drawer_layout.x - 8.f;
+        float drawer_y = drawer_layout.y - 200.f;
         float drawer_height = 400.f;
 
         if (iui_nav_drawer_begin(ui, &drawer_state, drawer_x, drawer_y,
@@ -3038,20 +3040,22 @@ static void example_frame(void *arg)
 
 #ifdef CONFIG_MODULE_OVERLAY
     /* Menu bar */
-    iui_flex(ui, 2, (float[]) {60, 60}, 0, 4);
-    iui_rect_t file_btn_slot = iui_flex_next(ui);
+    iui_sizing_t menu_sizes[] = {IUI_FIXED(60), IUI_FIXED(60)};
+    iui_box_begin(ui, &(iui_box_config_t) {
+                          .child_count = 2, .sizes = menu_sizes, .gap = 4});
+    iui_rect_t file_btn_slot = iui_box_next(ui);
     if (iui_text_button(ui, "File", IUI_ALIGN_CENTER)) {
         iui_menu_close(&state->edit_menu);
         iui_menu_open(&state->file_menu, "file_menu", file_btn_slot.x,
                       file_btn_slot.y + file_btn_slot.height);
     }
-    iui_rect_t edit_btn_slot = iui_flex_next(ui);
+    iui_rect_t edit_btn_slot = iui_box_next(ui);
     if (iui_text_button(ui, "Edit", IUI_ALIGN_CENTER)) {
         iui_menu_close(&state->file_menu);
         iui_menu_open(&state->edit_menu, "edit_menu", edit_btn_slot.x,
                       edit_btn_slot.y + edit_btn_slot.height);
     }
-    iui_flex_end(ui);
+    iui_box_end(ui);
 #endif /* CONFIG_MODULE_OVERLAY */
     iui_newline(ui);
 
@@ -3061,7 +3065,7 @@ static void example_frame(void *arg)
      */
     const float toggle_grid_pad = 4.f;
     const float toggle_cell_w =
-        (iui_layout_get_current(ui)->width - toggle_grid_pad) * 0.5f;
+        (iui_get_layout_rect(ui).width - toggle_grid_pad) * 0.5f;
     iui_grid_begin(ui, 2, toggle_cell_w, 26, toggle_grid_pad);
 #ifdef CONFIG_DEMO_CALCULATOR
     if (iui_switch(ui, "Calculator", &state->show_calculator, NULL, NULL) &&
@@ -3152,7 +3156,7 @@ static void example_frame(void *arg)
     /* Action buttons */
     const float action_grid_pad = 4.f;
     const float action_cell_w =
-        (iui_layout_get_current(ui)->width - action_grid_pad) * 0.5f;
+        (iui_get_layout_rect(ui).width - action_grid_pad) * 0.5f;
     iui_grid_begin(ui, 2, action_cell_w, 26, action_grid_pad);
 #ifdef CONFIG_MODULE_OVERLAY
     if (iui_filled_button(ui, "Dialog Demo", IUI_ALIGN_CENTER)) {

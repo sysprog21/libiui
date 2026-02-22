@@ -188,12 +188,27 @@ class TypographyScale:
 
 
 @dataclass
+class LayoutTier:
+    """Size-class-keyed layout values (compact/medium/expanded)."""
+
+    compact: float = 0.0
+    medium: float = 0.0
+    expanded: float = 0.0
+    large: float = 0.0
+    extra_large: float = 0.0
+
+
+@dataclass
 class Spec:
     components: dict = field(default_factory=dict)
     grid_unit: float = 4.0
     state_layer: StateLayer = field(default_factory=StateLayer)
     shape_tokens: ShapeTokens = field(default_factory=ShapeTokens)
     typography_scale: TypographyScale = field(default_factory=TypographyScale)
+    window_size_class: LayoutTier = field(default_factory=LayoutTier)
+    layout_columns: LayoutTier = field(default_factory=LayoutTier)
+    layout_margin: LayoutTier = field(default_factory=LayoutTier)
+    layout_gutter: LayoutTier = field(default_factory=LayoutTier)
 
 
 # =============================================================================
@@ -277,6 +292,18 @@ def parse_dsl(content: str) -> Spec:
         if re.match(r"GLOBAL\s+typography\s*\{", line):
             current_block = "typography"
             continue
+        if re.match(r"GLOBAL\s+window_size_class\s*\{", line):
+            current_block = "window_size_class"
+            continue
+        if re.match(r"GLOBAL\s+layout_columns\s*\{", line):
+            current_block = "layout_columns"
+            continue
+        if re.match(r"GLOBAL\s+layout_margin\s*\{", line):
+            current_block = "layout_margin"
+            continue
+        if re.match(r"GLOBAL\s+layout_gutter\s*\{", line):
+            current_block = "layout_gutter"
+            continue
 
         # End of block
         if line == "}":
@@ -293,6 +320,10 @@ def parse_dsl(content: str) -> Spec:
                     "state_layer": spec.state_layer,
                     "shape": spec.shape_tokens,
                     "typography": spec.typography_scale,
+                    "window_size_class": spec.window_size_class,
+                    "layout_columns": spec.layout_columns,
+                    "layout_margin": spec.layout_margin,
+                    "layout_gutter": spec.layout_gutter,
                 }[current_block]
                 converter = int if current_block == "state_layer" else float
                 setattr(obj, m.group(1), converter(m.group(2)))

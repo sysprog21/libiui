@@ -148,29 +148,11 @@ static bool iui_icon_button_internal(iui_context *ctx,
     float btn_size = IUI_ICON_BUTTON_SIZE;
     iui_rect_t button_rect;
 
-    if (ctx->in_grid) {
-        /* In grid mode, use cell dimensions but center the icon button */
+    if (ctx->in_grid || ctx->box_depth > 0) {
+        /* In grid/box mode, center the icon button within the layout cell */
         button_rect = (iui_rect_t) {
             .x = ctx->layout.x + (ctx->layout.width - btn_size) * 0.5f,
             .y = ctx->layout.y + (ctx->layout.height - btn_size) * 0.5f,
-            .width = btn_size,
-            .height = btn_size,
-        };
-    } else if (ctx->in_flex) {
-        /* In flex mode, use layout rect */
-        iui_rect_t flex_rect = iui_flex_next(ctx);
-        button_rect = (iui_rect_t) {
-            .x = flex_rect.x + (flex_rect.width - btn_size) * 0.5f,
-            .y = flex_rect.y + (flex_rect.height - btn_size) * 0.5f,
-            .width = btn_size,
-            .height = btn_size,
-        };
-    } else if (ctx->in_row) {
-        /* In row mode, use layout_next */
-        iui_rect_t row_rect = iui_layout_next(ctx);
-        button_rect = (iui_rect_t) {
-            .x = row_rect.x + (row_rect.width - btn_size) * 0.5f,
-            .y = row_rect.y + (row_rect.height - btn_size) * 0.5f,
             .width = btn_size,
             .height = btn_size,
         };

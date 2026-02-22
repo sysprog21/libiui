@@ -697,4 +697,56 @@
 #define IUI_WCAG_AAA_LARGE 4.5f
 #endif
 
+/* MD3 Window Size Class Breakpoints (dp)
+ * Reference: https://m3.material.io/foundations/layout/applying-layout
+ */
+#ifndef IUI_BREAKPOINT_COMPACT
+#define IUI_BREAKPOINT_COMPACT 0.f
+#endif
+#ifndef IUI_BREAKPOINT_MEDIUM
+#define IUI_BREAKPOINT_MEDIUM 600.f
+#endif
+#ifndef IUI_BREAKPOINT_EXPANDED
+#define IUI_BREAKPOINT_EXPANDED 840.f
+#endif
+#ifndef IUI_BREAKPOINT_LARGE
+#define IUI_BREAKPOINT_LARGE 1200.f
+#endif
+#ifndef IUI_BREAKPOINT_XLARGE
+#define IUI_BREAKPOINT_XLARGE 1600.f
+#endif
+
+/* MD3 Layout Grid - Columns per window size class */
+#ifndef IUI_LAYOUT_COLUMNS_COMPACT
+#define IUI_LAYOUT_COLUMNS_COMPACT 4
+#endif
+#ifndef IUI_LAYOUT_COLUMNS_MEDIUM
+#define IUI_LAYOUT_COLUMNS_MEDIUM 8
+#endif
+#ifndef IUI_LAYOUT_COLUMNS_EXPANDED
+#define IUI_LAYOUT_COLUMNS_EXPANDED 12
+#endif
+
+/* MD3 Layout Grid - Margins per window size class */
+#ifndef IUI_LAYOUT_MARGIN_COMPACT
+#define IUI_LAYOUT_MARGIN_COMPACT 16.f
+#endif
+#ifndef IUI_LAYOUT_MARGIN_MEDIUM
+#define IUI_LAYOUT_MARGIN_MEDIUM 24.f
+#endif
+#ifndef IUI_LAYOUT_MARGIN_EXPANDED
+#define IUI_LAYOUT_MARGIN_EXPANDED 24.f
+#endif
+
+/* MD3 Layout Grid - Gutters (child gaps) per window size class */
+#ifndef IUI_LAYOUT_GUTTER_COMPACT
+#define IUI_LAYOUT_GUTTER_COMPACT 8.f
+#endif
+#ifndef IUI_LAYOUT_GUTTER_MEDIUM
+#define IUI_LAYOUT_GUTTER_MEDIUM 8.f
+#endif
+#ifndef IUI_LAYOUT_GUTTER_EXPANDED
+#define IUI_LAYOUT_GUTTER_EXPANDED 16.f
+#endif
+
 #endif /* IUI_SPEC_H_ */

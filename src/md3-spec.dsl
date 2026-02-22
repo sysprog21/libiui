@@ -358,6 +358,32 @@ COMPONENT dropdown {
 
 GLOBAL grid_unit 4
 
+GLOBAL window_size_class {
+    compact    0      # < 600dp: phone portrait
+    medium     600    # 600-839dp: tablet portrait, foldable
+    expanded   840    # 840-1199dp: tablet landscape
+    large      1200   # 1200-1599dp: desktop
+    extra_large 1600  # >= 1600dp: large desktop
+}
+
+GLOBAL layout_columns {
+    compact    4
+    medium     8
+    expanded   12
+}
+
+GLOBAL layout_margin {
+    compact    16
+    medium     24
+    expanded   24
+}
+
+GLOBAL layout_gutter {
+    compact    8
+    medium     8
+    expanded   16
+}
+
 GLOBAL state_layer {
     hover 8
     focus 12

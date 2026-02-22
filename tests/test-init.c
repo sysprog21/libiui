@@ -205,9 +205,9 @@ static void test_window_limit(void)
     PASS();
 }
 
-static void test_row_items_limit(void)
+static void test_box_children_limit(void)
 {
-    TEST(row_items_limit);
+    TEST(box_children_limit);
     void *buffer = malloc(iui_min_memory_size());
     iui_context *ctx = create_test_context(buffer, false);
     ASSERT_NOT_NULL(ctx);
@@ -215,40 +215,19 @@ static void test_row_items_limit(void)
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 800, 600, 0);
 
-    float widths[32];
-    for (int i = 0; i < 32; i++)
-        widths[i] = -1.0f;
-    iui_row(ctx, 32, widths, 30.0f);
+    /* child_count > IUI_MAX_BOX_CHILDREN should be rejected */
+    iui_rect_t r = iui_box_begin(
+        ctx, &(iui_box_config_t) {.child_count = 32, .cross = 30.0f});
+    ASSERT_NEAR(r.width, 0.0f, 0.001f);
 
-    for (int i = 0; i < 32; i++)
-        iui_layout_next(ctx);
+    /* Valid count should work */
+    iui_box_begin(ctx, &(iui_box_config_t) {.child_count = IUI_MAX_BOX_CHILDREN,
+                                            .cross = 30.0f,
+                                            .gap = 4.0f});
+    for (int i = 0; i < IUI_MAX_BOX_CHILDREN; i++)
+        iui_box_next(ctx);
+    iui_box_end(ctx);
 
-    iui_end_window(ctx);
-    iui_end_frame(ctx);
-
-    free(buffer);
-    PASS();
-}
-
-static void test_flex_items_limit(void)
-{
-    TEST(flex_items_limit);
-    void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
-    ASSERT_NOT_NULL(ctx);
-
-    iui_begin_frame(ctx, 1.0f / 60.0f);
-    iui_begin_window(ctx, "Test", 0, 0, 800, 600, 0);
-
-    float sizes[32];
-    for (int i = 0; i < 32; i++)
-        sizes[i] = -1.0f;
-    iui_flex(ctx, 32, sizes, 30.0f, 4.0f);
-
-    for (int i = 0; i < 32; i++)
-        iui_flex_next(ctx);
-
-    iui_flex_end(ctx);
     iui_end_window(ctx);
     iui_end_frame(ctx);
 
@@ -345,8 +324,7 @@ void run_bounds_tests(void)
     SECTION_BEGIN("Bounds & Limit Enforcement");
     test_id_stack_underflow();
     test_window_limit();
-    test_row_items_limit();
-    test_flex_items_limit();
+    test_box_children_limit();
     SECTION_END();
 }
 

@@ -20,11 +20,11 @@
 #ifndef IUI_STRING_BUFFER_SIZE
 #define IUI_STRING_BUFFER_SIZE 2048
 #endif
-#ifndef IUI_MAX_ROW_ITEMS
-#define IUI_MAX_ROW_ITEMS 16
+#ifndef IUI_MAX_BOX_DEPTH
+#define IUI_MAX_BOX_DEPTH 8
 #endif
-#ifndef IUI_MAX_FLEX_ITEMS
-#define IUI_MAX_FLEX_ITEMS 16
+#ifndef IUI_MAX_BOX_CHILDREN
+#define IUI_MAX_BOX_CHILDREN 16
 #endif
 #ifndef IUI_MAX_TABLE_COLS
 #define IUI_MAX_TABLE_COLS 16
@@ -512,6 +512,61 @@ typedef struct {
     float width, height;
 } iui_rect_t;
 
+/* MD3 Window Size Class for adaptive layouts
+ * Reference: https://m3.material.io/foundations/layout/applying-layout
+ */
+typedef enum iui_size_class {
+    IUI_SIZE_CLASS_COMPACT = 0, /* < 600dp: phone portrait */
+    IUI_SIZE_CLASS_MEDIUM,      /* 600-839dp: tablet portrait, foldable */
+    IUI_SIZE_CLASS_EXPANDED,    /* 840-1199dp: tablet landscape */
+    IUI_SIZE_CLASS_LARGE,       /* 1200-1599dp: desktop */
+    IUI_SIZE_CLASS_XLARGE,      /* >= 1600dp: large desktop */
+} iui_size_class_t;
+
+/* Sizing modes for box children */
+typedef enum iui_sizing_type {
+    IUI_SIZE_GROW = 0, /* expand to fill (default when zero-initialized) */
+    IUI_SIZE_FIXED,    /* exact pixels */
+    IUI_SIZE_PERCENT,  /* fraction of parent (0.0-1.0) */
+} iui_sizing_type_t;
+
+typedef struct {
+    iui_sizing_type_t type;
+    float value; /* pixels, weight, or fraction */
+    float min;   /* 0 = unconstrained */
+    float max;   /* 0 = unconstrained */
+} iui_sizing_t;
+
+#define IUI_FIXED(px) ((iui_sizing_t) {IUI_SIZE_FIXED, (px), 0, 0})
+#define IUI_GROW(w) ((iui_sizing_t) {IUI_SIZE_GROW, (w), 0, 0})
+#define IUI_PERCENT(f) ((iui_sizing_t) {IUI_SIZE_PERCENT, (f), 0, 0})
+
+/* Box container direction and alignment */
+typedef enum iui_direction { IUI_DIR_ROW = 0, IUI_DIR_COLUMN } iui_direction_t;
+typedef enum iui_cross_align {
+    IUI_CROSS_STRETCH = 0,
+    IUI_CROSS_START,
+    IUI_CROSS_CENTER,
+    IUI_CROSS_END
+} iui_cross_align_t;
+typedef struct {
+    float left, right, top, bottom;
+} iui_padding_t;
+
+#define IUI_PAD_ALL(v) ((iui_padding_t) {(v), (v), (v), (v)})
+#define IUI_PAD_XY(x, y) ((iui_padding_t) {(x), (x), (y), (y)})
+
+/* Box container configuration */
+typedef struct {
+    iui_direction_t direction; /* ROW (default) or COLUMN */
+    int child_count;           /* number of children */
+    const iui_sizing_t *sizes; /* main-axis sizes (NULL = all GROW(1)) */
+    float cross;               /* cross-axis size (0 = fill parent) */
+    float gap;                 /* spacing between children (snapped to 4dp) */
+    iui_padding_t padding;     /* inner padding (snapped to 4dp) */
+    iui_cross_align_t align;   /* cross-axis child alignment */
+} iui_box_config_t;
+
 typedef struct {
     void (*draw_box)(iui_rect_t rect,
                      float radius,
@@ -739,26 +794,32 @@ bool iui_push_id(iui_context *ctx, const void *data, size_t size);
 /* Pop an identifier from the ID stack */
 void iui_pop_id(iui_context *ctx);
 
-/* Flexible row layout
- * Defines a row with specified item widths
- * @ctx:    current UI context
- * @items:  number of items in the row
- * @widths: array of widths: positive = absolute pixels,
- *          negative = relative ratio, 0 = fill remaining
- * @height: row height in pixels (0 = use default row height)
+/* Box container layout (nestable, flexbox-like)
+ * Supports FIXED, GROW, and PERCENT sizing with min/max constraints.
+ * Nests up to IUI_MAX_BOX_DEPTH levels. Gap and padding snap to 4dp grid.
  *
- * Usage: Creates 3 items: 100px fixed, then two equal-width items sharing
- *        remaining space
- * iui_row(ctx, 3, (float[]){100, -1, -1}, 0)
+ * Usage:
+ *   iui_sizing_t sizes[] = { IUI_FIXED(200), IUI_GROW(1) };
+ *   iui_box_begin(ctx, &(iui_box_config_t){
+ *       .direction = IUI_DIR_ROW, .child_count = 2,
+ *       .sizes = sizes, .gap = 8,
+ *   });
+ *   iui_rect_t left = iui_box_next(ctx);
+ *   // ... draw widgets in left ...
+ *   iui_rect_t right = iui_box_next(ctx);
+ *   // ... draw widgets in right ...
+ *   iui_box_end(ctx);
  */
-void iui_row(iui_context *ctx, int items, const float *widths, float height);
+iui_rect_t iui_box_begin(iui_context *ctx, const iui_box_config_t *config);
+iui_rect_t iui_box_next(iui_context *ctx);
+void iui_box_end(iui_context *ctx);
+int iui_box_depth(const iui_context *ctx);
 
-/* Get the next layout rect in the current row
- * Automatically advances to the next item in the row
- *
- * Returns the rect for the current item
- */
-iui_rect_t iui_layout_next(iui_context *ctx);
+/* MD3 adaptive layout queries */
+iui_size_class_t iui_size_class(float width);
+int iui_layout_columns(iui_size_class_t sc);
+float iui_layout_margin(iui_size_class_t sc);
+float iui_layout_gutter(iui_size_class_t sc);
 
 /* @ctx:        current UI context
  * @delta_time: elapsed time in seconds since the previous frame
@@ -893,59 +954,21 @@ bool iui_radio(iui_context *ctx,
  * @cell_h: height of each cell
  * @pad:    padding between cells
  */
-void iui_grid_begin(iui_context *ctx,
-                    int cols,
-                    float cell_w,
-                    float cell_h,
-                    float pad);
+iui_rect_t iui_grid_begin(iui_context *ctx,
+                          int cols,
+                          float cell_w,
+                          float cell_h,
+                          float pad);
 
 /* Advances to the next cell in the grid */
-void iui_grid_next(iui_context *ctx);
+iui_rect_t iui_grid_next(iui_context *ctx);
 
 /* Ends the grid layout and returns to normal row layout */
 void iui_grid_end(iui_context *ctx);
 
-/* Items are distributed along the main axis (row=horizontal, column=vertical).
- * Size semantics (same as iui_row):
- * positive value = fixed size in pixels
- * negative value = flex ratio (e.g., -1, -2 means 1:2 ratio)
- * zero = take remaining space after fixed items
- *
- * Usage: Create 3-column row with fixed center and flexible sides
- * iui_flex(ctx, 3, (float[]){-1, 100, -2}, 0, 4);
- * First item gets 1/3 of remaining, fixed 100px center, last gets 2/3
- */
 
-/* Flex row layout (horizontal main axis)
- * @ctx:   current UI context
- * @items: number of items in the flex container
- * @sizes: array of sizes (positive=fixed, negative=flex ratio, 0=fill)
- * @cross: size on cross axis (0 = use default row_height)
- * @gap:   spacing between items in pixels
- */
-void iui_flex(iui_context *ctx,
-              int items,
-              const float *sizes,
-              float cross,
-              float gap);
-
-/* Flex column layout (vertical main axis) */
-void iui_flex_column(iui_context *ctx,
-                     int items,
-                     const float *sizes,
-                     float cross,
-                     float gap);
-
-/* Get the computed rect for the current flex item and advance to next
- * Must be called after iui_flex() or iui_flex_column()
- */
-iui_rect_t iui_flex_next(iui_context *ctx);
-
-/* End the flex container and restore previous layout */
-void iui_flex_end(iui_context *ctx);
-
-/* Returns the current layout rect, useful for custom rendering */
-const iui_rect_t *iui_layout_get_current(const iui_context *ctx);
+/* Returns the current layout rect (value copy), useful for custom rendering */
+iui_rect_t iui_get_layout_rect(const iui_context *ctx);
 
 /* Returns the current window's stored position
  * Used by scroll containers and custom layout widgets.
@@ -2821,7 +2844,7 @@ iui_search_bar_result iui_search_bar_ex(iui_context *ctx,
  * if (iui_chip_suggestion(ctx, "Try this")) apply_suggestion();
  *
  * Note: Chips participate in layout and advance the cursor.
- * For horizontal chip rows, use iui_flex() or iui_row().
+ * For horizontal chip rows, use iui_box_begin() with IUI_DIR_ROW.
  */
 
 /* Assist Chip - Contextual action

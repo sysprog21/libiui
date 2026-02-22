@@ -70,6 +70,7 @@ int main(int argc, char **argv)
     run_overflow_tests();
     run_navigation_tests();
     run_bottom_sheet_tests();
+    run_box_tests();
 
     /* Summary */
     if (g_tests_failed == 0) {

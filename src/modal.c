@@ -93,12 +93,3 @@ bool iui_modal_should_close(const iui_context *ctx)
     return !ctx->modal.rendering && !ctx->modal.clicked_inside &&
            (ctx->mouse_released & IUI_MOUSE_LEFT);
 }
-
-/* MD3 spacing tokens */
-
-float iui_spacing_snap(float value)
-{
-    if (value <= 0.f)
-        return 0.f;
-    return roundf(value / 4.f) * 4.f;
-}
