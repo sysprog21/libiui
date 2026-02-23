@@ -340,6 +340,15 @@ config DEMO_FONT_EDITOR
       Displays and renders glyphs from glyphs-data.inc.
       Demonstrates point editing and curve visualization.
 
+config DEMO_PIXELWALL
+    bool "Pixel-Grid Demo"
+    default y
+    depends on DEMO_EXAMPLE && MODULE_BASIC
+    help
+      Animated pixel-grid designs ported from PixelWall.
+      Includes Snake, Pong, Tetris, Invaders, and Pacman March.
+      Uses a segmented button to switch between designs.
+
 endmenu
 
 # Build Options

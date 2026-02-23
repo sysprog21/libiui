@@ -42,6 +42,10 @@
 #include "nyancat-data.h"
 #endif
 
+#ifdef CONFIG_DEMO_PIXELWALL
+#include "pixelwall-demo.h"
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -2921,6 +2925,10 @@ typedef struct {
 #ifdef CONFIG_DEMO_FONT_EDITOR
     bool show_font_editor;
 #endif
+#ifdef CONFIG_DEMO_PIXELWALL
+    pixelwall_state_t pixelwall;
+    bool show_pixelwall;
+#endif
 #ifdef CONFIG_FEATURE_THEME
     bool dark_mode;
 #endif
@@ -3019,6 +3027,10 @@ static void demo_close_other_windows(demo_state_t *state, bool *keep_open)
 #ifdef CONFIG_DEMO_FONT_EDITOR
     if (&state->show_font_editor != keep_open)
         state->show_font_editor = false;
+#endif
+#ifdef CONFIG_DEMO_PIXELWALL
+    if (&state->show_pixelwall != keep_open)
+        state->show_pixelwall = false;
 #endif
 }
 #endif /* CONFIG_MODULE_BASIC */
@@ -3197,6 +3209,12 @@ static void example_frame(void *arg)
         demo_close_other_windows(state, &state->show_font_editor);
     iui_grid_next(ui);
 #endif
+#ifdef CONFIG_DEMO_PIXELWALL
+    if (iui_switch(ui, "Pixel wall", &state->show_pixelwall, NULL, NULL) &&
+        state->show_pixelwall)
+        demo_close_other_windows(state, &state->show_pixelwall);
+    iui_grid_next(ui);
+#endif
 #ifdef CONFIG_FEATURE_THEME
     if (iui_switch(ui, "Dark mode", &state->dark_mode, NULL, NULL)) {
         iui_set_theme(ui,
@@ -3293,6 +3311,11 @@ static void example_frame(void *arg)
 #ifdef CONFIG_DEMO_FONT_EDITOR
     if (state->show_font_editor)
         draw_font_editor_window(ui);
+#endif
+#ifdef CONFIG_DEMO_PIXELWALL
+    if (state->show_pixelwall)
+        draw_pixelwall_window(ui, port, &state->pixelwall, delta_time,
+                              get_demo_window_height());
 #endif
 #ifdef CONFIG_MODULE_INPUT
     if (state->show_textfield_demo)
@@ -3608,11 +3631,20 @@ int main(int argc, char *argv[])
 #ifdef CONFIG_DEMO_ACCESSIBILITY
     state.show_accessibility = DEMO_DEFAULT_VIS;
 #endif
+#ifdef CONFIG_DEMO_FONT_EDITOR
+    state.show_font_editor = DEMO_DEFAULT_VIS;
+#endif
+#ifdef CONFIG_DEMO_PIXELWALL
+    state.show_pixelwall = DEMO_DEFAULT_VIS;
+#endif
 #ifdef CONFIG_FEATURE_THEME
     state.dark_mode = true;
 #endif
 #ifdef CONFIG_DEMO_CALCULATOR
     calc_init(&state.calc);
+#endif
+#ifdef CONFIG_DEMO_PIXELWALL
+    pixelwall_init(&state.pixelwall);
 #endif
 
 #ifdef CONFIG_FEATURE_THEME
