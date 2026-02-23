@@ -80,9 +80,10 @@ bool iui_nav_rail_item(iui_context *ctx,
     float rail_width =
         state->expanded ? IUI_NAV_RAIL_EXPANDED_WIDTH : IUI_NAV_RAIL_WIDTH;
 
-    /* Calculate item position (after FAB area + padding) */
+    /* FAB area: 16dp top margin + FAB height + 16dp gap below FAB */
+    float fab_area_h = 16.f + IUI_FAB_SIZE + 16.f;
     float item_y =
-        state->y + 88.f + state->item_count * IUI_NAV_RAIL_ITEM_HEIGHT;
+        state->y + fab_area_h + state->item_count * IUI_NAV_RAIL_ITEM_HEIGHT;
     float item_height = IUI_NAV_RAIL_ITEM_HEIGHT;
 
     iui_rect_t item_rect = {state->x, item_y, rail_width, item_height};
@@ -90,17 +91,27 @@ bool iui_nav_rail_item(iui_context *ctx,
 
     bool selected = (state->selected == index);
 
+    /* In collapsed mode the indicator sits at the top of the item (4dp
+     * margin) so the label has room below.  In expanded mode the label
+     * is inline (right of the icon), so the indicator is centered. */
+    float indicator_y;
+    if (state->expanded)
+        indicator_y =
+            item_y + (item_height - IUI_NAV_RAIL_INDICATOR_HEIGHT) * 0.5f;
+    else
+        indicator_y = item_y + 4.f;
+
     /* Draw selection indicator (pill shape) */
     if (selected) {
         float indicator_x =
             state->x + (rail_width - IUI_NAV_RAIL_INDICATOR_WIDTH) * 0.5f;
-        float indicator_y =
-            item_y + (item_height - IUI_NAV_RAIL_INDICATOR_HEIGHT) * 0.5f;
 
         if (state->expanded) {
             indicator_x = state->x + 12.f;
             float text_width = label ? iui_get_text_width(ctx, label) : 0;
-            float indicator_w = 56.f + 12.f + text_width + 12.f;
+            /* icon column (68dp from indicator_x) + 12dp gap + label + 12dp
+             * trailing = IUI_NAV_RAIL_WIDTH + text_width */
+            float indicator_w = IUI_NAV_RAIL_WIDTH + text_width;
             iui_rect_t indicator_rect = {indicator_x, indicator_y, indicator_w,
                                          IUI_NAV_RAIL_INDICATOR_HEIGHT};
             ctx->renderer.draw_box(indicator_rect, IUI_NAV_RAIL_CORNER_RADIUS,
@@ -122,8 +133,6 @@ bool iui_nav_rail_item(iui_context *ctx,
                                                iui_state_get_alpha(comp_state));
         float indicator_x =
             state->x + (rail_width - IUI_NAV_RAIL_INDICATOR_WIDTH) * 0.5f;
-        float indicator_y =
-            item_y + (item_height - IUI_NAV_RAIL_INDICATOR_HEIGHT) * 0.5f;
         iui_rect_t hover_rect = {indicator_x, indicator_y,
                                  IUI_NAV_RAIL_INDICATOR_WIDTH,
                                  IUI_NAV_RAIL_INDICATOR_HEIGHT};
@@ -131,15 +140,13 @@ bool iui_nav_rail_item(iui_context *ctx,
                                layer_color, ctx->renderer.user);
     }
 
-    /* Draw icon */
+    /* Draw icon — centered inside the indicator */
     float icon_cx, icon_cy;
-    if (state->expanded) {
-        icon_cx = state->x + 12.f + 28.f;
-        icon_cy = item_y + item_height * 0.5f;
-    } else {
+    icon_cy = indicator_y + IUI_NAV_RAIL_INDICATOR_HEIGHT * 0.5f;
+    if (state->expanded)
+        icon_cx = state->x + IUI_NAV_RAIL_WIDTH * 0.5f;
+    else
         icon_cx = state->x + rail_width * 0.5f;
-        icon_cy = item_y + item_height * 0.5f - 8.f;
-    }
 
     uint32_t icon_color = selected ? ctx->colors.on_secondary_container
                                    : ctx->colors.on_surface_variant;
@@ -151,13 +158,15 @@ bool iui_nav_rail_item(iui_context *ctx,
         uint32_t label_color = selected ? ctx->colors.on_secondary_container
                                         : ctx->colors.on_surface_variant;
         if (state->expanded) {
-            float label_x = state->x + 12.f + 56.f + 12.f;
+            /* Label starts after the icon column (IUI_NAV_RAIL_WIDTH wide) */
+            float label_x = state->x + IUI_NAV_RAIL_WIDTH;
             float label_y = item_y + (item_height - ctx->font_height) * 0.5f;
             iui_internal_draw_text(ctx, label_x, label_y, label, label_color);
         } else {
             float label_width = iui_get_text_width(ctx, label);
             float label_x = state->x + (rail_width - label_width) * 0.5f;
-            float label_y = item_y + item_height * 0.5f + 8.f;
+            /* 4dp gap below the indicator bottom */
+            float label_y = indicator_y + IUI_NAV_RAIL_INDICATOR_HEIGHT + 4.f;
             iui_internal_draw_text(ctx, label_x, label_y, label, label_color);
         }
     }

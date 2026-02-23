@@ -257,7 +257,7 @@ static void test_box_with_scroll(void)
     BEGIN_TEST_WINDOW(box_with_scroll);
 
     iui_scroll_state scroll = {0};
-    iui_scroll_begin(ctx, &scroll, 400, 200);
+    iui_scroll_begin(ctx, &scroll, 0.f, 200);
 
     iui_box_begin(ctx, &(iui_box_config_t) {.child_count = 2});
     iui_rect_t r1 = iui_box_next(ctx);

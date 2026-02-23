@@ -221,9 +221,19 @@ static void calc_equals(calculator_state_t *calc)
     calc->new_input = true;
 }
 
+/* Standard demo window position: 10dp gap right of libIUI Demo (x=30+340=370).
+ * y=30 keeps all windows top-aligned with the control panel. */
+#define DEMO_WIN_X 380
+#define DEMO_WIN_Y 30
+
+/* Forward declaration so all draw functions can call get_demo_window_height()
+ * without knowing the full implementation, which lives after the constants. */
+static float get_demo_window_height(void);
+
 static void draw_calculator_window(iui_context *ui, calculator_state_t *calc)
 {
-    iui_begin_window(ui, "Calculator", 380, 30, CALC_WIN_W, CALC_WIN_H, 0);
+    iui_begin_window(ui, "Calculator", DEMO_WIN_X, DEMO_WIN_Y, CALC_WIN_W,
+                     get_demo_window_height(), 0);
 
     iui_text(ui, IUI_ALIGN_RIGHT, "%s", calc->display);
     iui_newline(ui);
@@ -307,8 +317,8 @@ static void draw_calculator_window(iui_context *ui, calculator_state_t *calc)
 
 static void draw_clock_window(iui_context *ui, iui_port_ctx *port)
 {
-    iui_begin_window(ui, "Analog Clock", 380, 30, 320, 260,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Analog Clock", DEMO_WIN_X, DEMO_WIN_Y, 320,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
     iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 200.f});
     iui_rect_t rect = iui_box_next(ui);
 
@@ -373,8 +383,8 @@ static void draw_clock_window(iui_context *ui, iui_port_ctx *port)
 
 static void draw_vector_demo_window(iui_context *ui, float progress_value)
 {
-    iui_begin_window(ui, "Vector Primitives", 380, 30, 390, 280,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Vector Primitives", DEMO_WIN_X, DEMO_WIN_Y, 390,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     const uint32_t COLOR_RED = 0xFFE53935;
     const uint32_t COLOR_ORANGE = 0xFFFB8C00;
@@ -653,7 +663,8 @@ static void draw_nyancat_window(iui_context *ui, iui_port_ctx *port)
 {
     nyancat_init_frames();
 
-    iui_begin_window(ui, "Nyan Cat", 380, 30, 390, 340, IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Nyan Cat", DEMO_WIN_X, DEMO_WIN_Y, 390,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
     iui_box_begin(ui, &(iui_box_config_t) {.child_count = 1, .cross = 280.f});
     iui_rect_t area = iui_box_next(ui);
 
@@ -706,8 +717,8 @@ static void draw_nyancat_window(iui_context *ui, iui_port_ctx *port)
 #ifdef CONFIG_DEMO_THEME
 static void draw_color_scheme_window(iui_context *ui, iui_port_ctx *port)
 {
-    iui_begin_window(ui, "Color Scheme", 380, 30, 300, 560,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Color Scheme", DEMO_WIN_X, DEMO_WIN_Y, 300,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     const iui_theme_t *theme = iui_get_theme(ui);
     const int sw = 65, sh = 32;
@@ -833,7 +844,8 @@ static void draw_color_scheme_window(iui_context *ui, iui_port_ctx *port)
 
 static void draw_iui_components_window(iui_context *ui, float delta_time)
 {
-    iui_begin_window(ui, "UI Components", 360, 30, 400, 400,
+    iui_begin_window(ui, "UI Components", DEMO_WIN_X, DEMO_WIN_Y, 420,
+                     get_demo_window_height(),
                      IUI_WINDOW_RESIZABLE | IUI_WINDOW_AUTO_SIZE);
 
     static int tab_sel = 0;
@@ -990,7 +1002,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "SCROLLABLE");
 
         static iui_scroll_state widget_scroll = {0};
-        iui_scroll_begin(ui, &widget_scroll, 350.f, 60.f);
+        iui_scroll_begin(ui, &widget_scroll, 0.f, 60.f);
         for (int i = 0; i < 20; i++) {
             iui_text(ui, IUI_ALIGN_LEFT, "Scroll item %d", i + 1);
             iui_newline(ui);
@@ -1247,8 +1259,8 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
 #ifdef CONFIG_DEMO_ACCESSIBILITY
 static void draw_accessibility_window(iui_context *ui)
 {
-    iui_begin_window(ui, "Accessibility", 380, 30, 340, 520,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Accessibility", DEMO_WIN_X, DEMO_WIN_Y, 340,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     const iui_theme_t *theme = iui_get_theme(ui);
 
@@ -1963,8 +1975,8 @@ static void draw_font_editor_window(iui_context *ui)
         st.moving = false;
     }
 
-    iui_begin_window(ui, "Font Editor", 380, 30, 460, 580,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Font Editor", DEMO_WIN_X, DEMO_WIN_Y, 460,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     /* Row 1: Prev/Next + character info */
     iui_grid_begin(ui, 3, 50.f, 24, 4.f);
@@ -2026,7 +2038,8 @@ static void draw_font_editor_window(iui_context *ui)
 #ifdef CONFIG_DEMO_MOTION
 static void draw_motion_window(iui_context *ui, float delta_time)
 {
-    iui_begin_window(ui, "Motion", 390, 30, 360, 420, IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Motion", DEMO_WIN_X, DEMO_WIN_Y, 360,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     const iui_theme_t *theme = iui_get_theme(ui);
 
@@ -2153,10 +2166,11 @@ static void draw_textfield_window(iui_context *ui)
     /* Scroll state for the window content */
     static iui_scroll_state scroll = {0};
 
-    iui_begin_window(ui, "TextField", 380, 30, 390, 400, IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "TextField", DEMO_WIN_X, DEMO_WIN_Y, 390,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     /* Scrollable content area */
-    iui_scroll_begin(ui, &scroll, 370.f, 360.f);
+    iui_scroll_begin(ui, &scroll, 0.f, 360.f);
 
     iui_text_label_small(ui, IUI_ALIGN_LEFT, "BASIC (FILLED)");
     {
@@ -2268,8 +2282,8 @@ static void draw_textfield_window(iui_context *ui)
 
 static void draw_appbar_demo_window(iui_context *ui)
 {
-    iui_begin_window(ui, "Top App Bar", 380, 30, 420, 520,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Top App Bar", DEMO_WIN_X, DEMO_WIN_Y, 420,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     static int appbar_tab = 0;
     static const char *appbar_tabs[] = {"Small", "Center", "Medium", "Large"};
@@ -2332,7 +2346,7 @@ static void draw_appbar_demo_window(iui_context *ui)
             printf("Bookmark action clicked\n");
 
         iui_text_body_small(ui, IUI_ALIGN_LEFT, "Scroll content below:");
-        iui_scroll_begin(ui, &appbar_scroll, 380.f, 180.f);
+        iui_scroll_begin(ui, &appbar_scroll, 0.f, 180.f);
         for (int i = 0; i < 30; i++) {
             iui_text(ui, IUI_ALIGN_LEFT,
                      "Scrollable item %d - scroll to collapse", i + 1);
@@ -2359,7 +2373,7 @@ static void draw_appbar_demo_window(iui_context *ui)
             printf("Delete action clicked\n");
 
         iui_text_body_small(ui, IUI_ALIGN_LEFT, "Scroll content below:");
-        iui_scroll_begin(ui, &appbar_scroll, 380.f, 150.f);
+        iui_scroll_begin(ui, &appbar_scroll, 0.f, 150.f);
         for (int i = 0; i < 30; i++) {
             iui_text(ui, IUI_ALIGN_LEFT,
                      "Large bar item %d - scroll to see collapse", i + 1);
@@ -2381,7 +2395,8 @@ static void draw_appbar_demo_window(iui_context *ui)
 
 static void draw_list_demo_window(iui_context *ui)
 {
-    iui_begin_window(ui, "Lists Demo", 430, 30, 380, 480, IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Lists Demo", DEMO_WIN_X, DEMO_WIN_Y, 380,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     static int list_tab = 0;
     static const char *list_tabs[] = {"Simple", "Two-line", "Controls"};
@@ -2389,7 +2404,7 @@ static void draw_list_demo_window(iui_context *ui)
     iui_newline(ui);
 
     static iui_scroll_state list_scroll = {0};
-    iui_scroll_begin(ui, &list_scroll, 360.f, 380.f);
+    iui_scroll_begin(ui, &list_scroll, 0.f, 380.f);
 
     if (list_tab == 0) {
         /* Simple one-line lists */
@@ -2535,8 +2550,8 @@ static void draw_list_demo_window(iui_context *ui)
 
 static void draw_navigation_demo_window(iui_context *ui)
 {
-    iui_begin_window(ui, "Navigation Demo", 390, 50, 410, 540,
-                     IUI_WINDOW_RESIZABLE);
+    iui_begin_window(ui, "Navigation Demo", DEMO_WIN_X, DEMO_WIN_Y, 410,
+                     get_demo_window_height(), IUI_WINDOW_RESIZABLE);
 
     static int nav_tab = 0;
     static const char *nav_tabs[] = {"Rail", "Bar", "Drawer"};
@@ -2565,11 +2580,25 @@ static void draw_navigation_demo_window(iui_context *ui)
 #endif
         iui_newline(ui);
 
-        /* Get available area */
+        /* Get available area.
+         * iui_get_remaining_height() reads the live window clip rect so it
+         * correctly accounts for title bar, padding, and decorations —
+         * unlike (win.y + win.height - layout.y) which uses the outer frame.
+         *
+         * Snap rail_height to the nearest row_h multiple so skip_rows
+         * advances the cursor exactly to the rail bottom with 2 rows
+         * guaranteed for the status text below: given
+         *   avail_rows = floor((avail - 8) / row_h)
+         *   rail_height = (avail_rows - 2) * row_h - 8
+         * the cursor after skip_rows equals (avail_rows-2)*row_h, leaving
+         * at least 2*row_h + remainder between cursor and clip_bottom. */
         iui_rect_t layout = iui_get_layout_rect(ui);
         float rail_x = layout.x;
         float rail_y = layout.y + 8.f;
-        float rail_height = 320.f;
+        float row_h = fmaxf(1.f, layout.height); /* guard against uninit ctx */
+        float avail = iui_get_remaining_height(ui);
+        int avail_rows = (int) floorf((avail - 8.f) / row_h);
+        float rail_height = fmaxf(80.f, (float) (avail_rows - 2) * row_h - 8.f);
 
         iui_nav_rail_begin(ui, &rail_state, rail_x, rail_y, rail_height);
 
@@ -2590,8 +2619,18 @@ static void draw_navigation_demo_window(iui_context *ui)
 
         iui_nav_rail_end(ui, &rail_state);
 
-        /* Show info text below rail */
-        for (int i = 0; i < 11; i++)
+        /* Advance layout cursor past the rail.
+         * rail_y starts 8dp below layout.y, so total vertical span from
+         * layout.y is (8 + rail_height).  Use ceilf to avoid landing
+         * inside the rail's last row. */
+        /* Subtract a small epsilon before ceiling to prevent FP rounding
+         * (e.g. 8.f + (N*row_h - 8.f) may compute as N*row_h + epsilon)
+         * from silently adding an extra row.  Scale with row_h: at large
+         * values (row_h~100, N~1000) the ULP at N*row_h is ~0.008f, so a
+         * fixed 0.01f would be unreliable; 1e-4*row_h stays below 1 ULP. */
+        float eps = fmaxf(0.01f, row_h * 1e-4f);
+        int skip_rows = (int) ceilf((8.f + rail_height - eps) / row_h);
+        for (int i = 0; i < skip_rows; i++)
             iui_newline(ui);
         iui_text_body_small(ui, IUI_ALIGN_LEFT, "Selected: %d",
                             rail_state.selected);
@@ -2728,17 +2767,14 @@ static void draw_navigation_demo_window(iui_context *ui)
  * arranged in 2 columns.
  */
 
-#ifdef CONFIG_MODULE_BASIC
-/* Count enabled demo toggles at runtime */
+/* Count enabled demo toggles at runtime.
+ * Must mirror the toggle grid in example_frame exactly.
+ * The entire grid is gated on CONFIG_MODULE_INPUT; entries within follow
+ * the same preprocessor conditions as their iui_switch() calls. */
 static int get_demo_toggle_count(void)
 {
     int count = 0;
 #ifdef CONFIG_MODULE_INPUT
-    count += 2; /* Components, TextField - require MODULE_INPUT */
-#endif
-#ifdef CONFIG_MODULE_NAVIGATION
-    count++; /* App Bar */
-#endif
 #ifdef CONFIG_DEMO_CALCULATOR
     count++;
 #endif
@@ -2751,8 +2787,18 @@ static int get_demo_toggle_count(void)
 #ifdef CONFIG_DEMO_NYANCAT
     count++;
 #endif
+#if defined(CONFIG_MODULE_BASIC) && defined(CONFIG_MODULE_CONTAINER)
+    count++; /* Components */
+#endif
 #ifdef CONFIG_DEMO_THEME
-    count++;
+    count++; /* Colors */
+#endif
+    count++; /* TextField - unconditional within MODULE_INPUT */
+#ifdef CONFIG_MODULE_NAVIGATION
+    count += 2; /* App Bar + Nav */
+#endif
+#ifdef CONFIG_MODULE_LIST
+    count++; /* Lists */
 #endif
 #ifdef CONFIG_DEMO_MOTION
     count++;
@@ -2760,9 +2806,13 @@ static int get_demo_toggle_count(void)
 #ifdef CONFIG_DEMO_ACCESSIBILITY
     count++;
 #endif
-#ifdef CONFIG_FEATURE_THEME
-    count++; /* Dark mode toggle */
+#ifdef CONFIG_DEMO_FONT_EDITOR
+    count++; /* Font Editor */
 #endif
+#ifdef CONFIG_FEATURE_THEME
+    count++; /* Dark mode */
+#endif
+#endif /* CONFIG_MODULE_INPUT */
     return count;
 }
 
@@ -2816,7 +2866,6 @@ static float get_demo_window_height(void)
     return title_area + content_rows + divider + toggle_grid + action_grid +
            bottom_pad;
 }
-#endif /* CONFIG_MODULE_BASIC - control panel helpers */
 
 /* Main loop state structure.
  * For Emscripten builds, emscripten_set_main_loop_arg() requires all state
@@ -2966,6 +3015,10 @@ static void demo_close_other_windows(demo_state_t *state, bool *keep_open)
 #ifdef CONFIG_DEMO_ACCESSIBILITY
     if (&state->show_accessibility != keep_open)
         state->show_accessibility = false;
+#endif
+#ifdef CONFIG_DEMO_FONT_EDITOR
+    if (&state->show_font_editor != keep_open)
+        state->show_font_editor = false;
 #endif
 }
 #endif /* CONFIG_MODULE_BASIC */

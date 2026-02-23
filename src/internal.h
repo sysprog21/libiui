@@ -28,6 +28,11 @@
 #define IUI_PI 3.14159265358979323846f
 #endif
 
+/* Scroll */
+#ifndef IUI_SCROLLBAR_W
+#define IUI_SCROLLBAR_W 8.f /* vertical scrollbar width in pixels */
+#endif
+
 /* Performance optimization constants */
 #ifndef IUI_DRAW_CMD_BUFFER_SIZE
 #define IUI_DRAW_CMD_BUFFER_SIZE 256 /* max draw commands per batch */
@@ -445,7 +450,8 @@ struct iui_context {
     iui_scroll_state *active_scroll;
     iui_scroll_state *scroll_dragging;
     iui_rect_t scroll_viewport;
-    float scroll_content_start_x, scroll_content_start_y;
+    float scroll_content_start_x, scroll_content_start_y,
+        scroll_content_start_width;
     float scroll_wheel_dx, scroll_wheel_dy, scroll_drag_offset;
 
     /* COLD PATH - Typography and Token Systems */

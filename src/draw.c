@@ -795,28 +795,27 @@ bool iui_push_clip(iui_context *ctx, iui_rect_t rect)
     if (ctx->clip.depth >= IUI_CLIP_STACK_SIZE)
         return false; /* Stack overflow - return error */
 
-    /* If there's a current clip, intersect with it */
+    /* Intersect with current clip if any */
     if (ctx->clip.depth > 0) {
         iui_rect_t current = ctx->clip.stack[ctx->clip.depth - 1];
-        /* Intersect rectangles */
+        /* Compute right/bottom BEFORE clamping origin so the original
+         * rect.x + rect.width is used, not the shifted value. */
+        float right = fminf(rect.x + rect.width, current.x + current.width);
+        float bottom = fminf(rect.y + rect.height, current.y + current.height);
         rect.x = fmaxf(rect.x, current.x);
         rect.y = fmaxf(rect.y, current.y);
-        rect.width =
-            fminf(rect.x + rect.width, current.x + current.width) - rect.x;
-        rect.height =
-            fminf(rect.y + rect.height, current.y + current.height) - rect.y;
+        rect.width = right - rect.x;
+        rect.height = bottom - rect.y;
     }
 
-    /* Ensure valid dimensions after intersection */
-    if (rect.width <= 0 || rect.height <= 0) {
-        /* Push an invalid rect that will cause clipping */
+    /* Degenerate intersection: push zero rect so everything clips */
+    if (rect.width <= 0 || rect.height <= 0)
         rect = (iui_rect_t) {0, 0, 0, 0};
-    }
 
     ctx->clip.stack[ctx->clip.depth] = rect;
     ctx->clip.depth++;
 
-    /* Update renderer with the new clip rect (safe clamping to uint16 range) */
+    /* Update renderer (clamp to uint16 range) */
     uint16_t clip_minx = iui_float_to_u16(rect.x);
     uint16_t clip_miny = iui_float_to_u16(rect.y);
     uint16_t clip_maxx = iui_float_to_u16(rect.x + rect.width);
@@ -825,17 +824,19 @@ bool iui_push_clip(iui_context *ctx, iui_rect_t rect)
         (iui_clip_rect) {clip_minx, clip_miny, clip_maxx, clip_maxy};
     ctx->renderer.set_clip_rect(clip_minx, clip_miny, clip_maxx, clip_maxy,
                                 ctx->renderer.user);
-    return true; /* Success */
+    return true;
 }
 
 void iui_pop_clip(iui_context *ctx)
 {
-    if (ctx->clip.depth <= 0)
+    /* Floor at depth 1 while inside a window to protect the window clip.
+     * iui_end_window bypasses this by clearing current_window first. */
+    int floor = (ctx->current_window != NULL) ? 1 : 0;
+    if (ctx->clip.depth <= floor)
         return;
 
     ctx->clip.depth--;
 
-    /* Restore previous clip rect */
     if (ctx->clip.depth > 0) {
         iui_rect_t prev = ctx->clip.stack[ctx->clip.depth - 1];
         uint16_t clip_minx = iui_float_to_u16(prev.x);
@@ -847,8 +848,8 @@ void iui_pop_clip(iui_context *ctx)
         ctx->renderer.set_clip_rect(clip_minx, clip_miny, clip_maxx, clip_maxy,
                                     ctx->renderer.user);
     } else {
+        /* No clips left: reset to full screen */
         ctx->current_clip = (iui_clip_rect) {0, 0, UINT16_MAX, UINT16_MAX};
-        /* No clips left, reset to full screen */
         ctx->renderer.set_clip_rect(0, 0, UINT16_MAX, UINT16_MAX,
                                     ctx->renderer.user);
     }

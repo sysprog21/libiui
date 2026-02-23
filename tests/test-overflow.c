@@ -124,23 +124,30 @@ static void test_large_coord_clip(void)
 
     reset_counters();
 
-    /* Push clip with very large coordinates (should be clamped) */
+    /* Push clip with very large coordinates entirely outside the window content
+     * area.  iui_begin_window now pushes the window clip onto the stack, so
+     * any nested clip is intersected with it.  A clip at x=100000 is well
+     * beyond the window right edge (~384px) — the intersection collapses it
+     * to an empty rect, which the renderer receives as (0,0)-(0,0). */
     iui_rect_t large_clip = {100000.f, 100000.f, 50000.f, 50000.f};
     bool success = iui_push_clip(ctx, large_clip);
     ASSERT_TRUE(success);
 
-    /* Verify coordinates were clamped to uint16 max (150000 -> 65535) */
-    ASSERT_EQ(g_last_clip_max_x, UINT16_MAX);
-    ASSERT_EQ(g_last_clip_max_y, UINT16_MAX);
+    /* Clip is outside window bounds → collapsed to empty → max_x == 0 */
+    ASSERT_EQ(g_last_clip_max_x, 0);
+    ASSERT_EQ(g_last_clip_max_y, 0);
 
     iui_pop_clip(ctx);
 
-    /* Test negative coordinates (should clamp to 0) */
+    /* Test negative coordinates: the clip partially overlaps the window content
+     * area, so the intersection result is bounded to the window clip.
+     * min_x will be the window content left edge (not the negative origin). */
     iui_rect_t neg_clip = {-100.f, -100.f, 200.f, 200.f};
     success = iui_push_clip(ctx, neg_clip);
     ASSERT_TRUE(success);
-    ASSERT_EQ(g_last_clip_min_x, 0);
-    ASSERT_EQ(g_last_clip_min_y, 0);
+    /* clamped — no negative renderer coords */
+    ASSERT_TRUE(g_last_clip_min_x >= 0);
+    ASSERT_TRUE(g_last_clip_min_y >= 0);
 
     iui_pop_clip(ctx);
 

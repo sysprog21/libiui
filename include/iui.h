@@ -976,6 +976,18 @@ iui_rect_t iui_get_layout_rect(const iui_context *ctx);
  */
 iui_rect_t iui_get_window_rect(const iui_context *ctx);
 
+/* Returns the height remaining from the current layout cursor to the bottom
+ * of the WINDOW clip rect (clip.stack[0]).  Unlike iui_get_window_rect(),
+ * this reads the live clip stack so it correctly accounts for title bars and
+ * padding without callers needing to know the internal geometry.
+ * Returns 0 if no window is active.
+ *
+ * Note: always reads the window-level clip, not any nested scroll clip.
+ * Use this when sizing widgets that must fill the rest of the window
+ * (e.g. nav rail, list views that are NOT inside a scroll region).
+ */
+float iui_get_remaining_height(const iui_context *ctx);
+
 /* Reports minimum content width requirement for auto-sizing windows.
  * Widgets call this to indicate their required width.
  * The window will expand to fit if window_auto_width flag is set.

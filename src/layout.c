@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "internal.h"
 
 /* Dirty rectangle tracking */
@@ -645,15 +646,18 @@ bool iui_begin_window(iui_context *ctx,
         ctx->renderer.draw_box(handle_rect, 0.f, ctx->colors.outline_variant,
                                ctx->renderer.user);
 
-    /* clip rect (use safe clamping to prevent uint16 overflow) */
-    uint16_t clip_minx = iui_float_to_u16(ctx->layout.x);
-    uint16_t clip_miny = iui_float_to_u16(ctx->layout.y);
-    uint16_t clip_maxx = iui_float_to_u16(ctx->layout.x + ctx->layout.width);
-    uint16_t clip_maxy = iui_float_to_u16(w->pos.y + w->height - ctx->padding);
-    ctx->current_clip =
-        (iui_clip_rect) {clip_minx, clip_miny, clip_maxx, clip_maxy};
-    ctx->renderer.set_clip_rect(clip_minx, clip_miny, clip_maxx, clip_maxy,
-                                ctx->renderer.user);
+    /* Push window content clip so nested clips (scroll, banners) intersect
+     * with window bounds instead of escaping when depth == 0. */
+    iui_rect_t win_clip = {
+        .x = ctx->layout.x,
+        .y = ctx->layout.y,
+        .width = ctx->layout.width,
+        .height = w->pos.y + w->height - ctx->padding - ctx->layout.y,
+    };
+    if (!iui_push_clip(ctx, win_clip)) {
+        ctx->current_window = NULL; /* clip overflow: abort window */
+        return false;
+    }
     return true;
 }
 
@@ -661,9 +665,16 @@ void iui_newline(iui_context *ctx)
 {
     if (!ctx->current_window)
         return;
-    ctx->layout.x = ctx->current_window->pos.x + ctx->padding * 2.f;
     ctx->layout.y += ctx->row_height;
-    ctx->layout.width = ctx->current_window->width - ctx->padding * 4.f;
+    if (ctx->active_scroll) {
+        /* Preserve scroll-constrained width (view_w - scrollbar) and
+         * reset x to the scroll-offset-adjusted left boundary. */
+        ctx->layout.x =
+            ctx->scroll_content_start_x - ctx->active_scroll->scroll_x;
+    } else {
+        ctx->layout.x = ctx->current_window->pos.x + ctx->padding * 2.f;
+        ctx->layout.width = ctx->current_window->width - ctx->padding * 4.f;
+    }
 }
 
 /* Grid Layout */
@@ -680,6 +691,15 @@ iui_rect_t iui_grid_begin(iui_context *ctx,
     /* Report required width for auto-sizing windows */
     float required_width = (float) cols * cell_w + (float) (cols - 1) * pad;
     iui_require_content_width(ctx, required_width);
+
+#ifndef NDEBUG
+    /* Skip check for AUTO_SIZE windows: they legitimately start undersized and
+     * grow to fit after the first frame via iui_require_content_width. */
+    if (!(ctx->current_window->options & IUI_WINDOW_AUTO_SIZE)) {
+        assert(required_width <= ctx->layout.width + 0.5f &&
+               "grid exceeds layout width; reduce cols/cell_w or widen window");
+    }
+#endif
 
     ctx->in_grid = true;
     ctx->grid = (iui_grid_state) {
@@ -745,6 +765,17 @@ iui_rect_t iui_get_window_rect(const iui_context *ctx)
                          ctx->current_window->height};
 }
 
+float iui_get_remaining_height(const iui_context *ctx)
+{
+    if (!ctx || !ctx->current_window || ctx->clip.depth == 0)
+        return 0.f;
+    /* stack[0] is always the window clip pushed by iui_begin_window */
+    const iui_rect_t *win_clip = &ctx->clip.stack[0];
+    float clip_bottom = win_clip->y + win_clip->height;
+    float remaining = clip_bottom - ctx->layout.y;
+    return remaining > 0.f ? remaining : 0.f;
+}
+
 void iui_require_content_width(iui_context *ctx, float width)
 {
     if (!ctx->current_window)
@@ -760,11 +791,10 @@ void iui_end_window(iui_context *ctx)
     if (!ctx->current_window)
         return;
 
-    /* Update min_height based on content (existing behavior) */
     ctx->current_window->min_height =
         ctx->layout.y - ctx->current_window->pos.y + ctx->row_height * 2.f;
 
-    /* Update min_width based on content requirements (only for auto-sizing) */
+    /* Update min_width for auto-sizing windows */
     if (ctx->current_window->options &
         (IUI_WINDOW_AUTO_WIDTH | IUI_WINDOW_AUTO_HEIGHT)) {
         float content_min_width =
@@ -777,13 +807,20 @@ void iui_end_window(iui_context *ctx)
     }
     ctx->window_content_min_width = 0.f;
 
-    ctx->current_window = NULL;
+    /* Assert balanced clips and no abandoned scroll regions.
+     * Clear current_window BEFORE iui_pop_clip so the floor guard
+     * (depth >= 1 while inside a window) allows this final pop. */
+    assert(!ctx->active_scroll &&
+           "abandoned scroll region: iui_scroll_end not called inside window");
+    assert(ctx->clip.depth == 1 &&
+           "unbalanced iui_push_clip/iui_pop_clip inside window");
+    ctx->clip.depth = 1;        /* safety: discard any leaked clips */
+    ctx->current_window = NULL; /* must precede pop for floor guard bypass */
+    iui_pop_clip(ctx);
+
     /* Reset layout modes to prevent state leaking between windows */
     ctx->in_grid = false;
     ctx->box_depth = 0;
-    ctx->current_clip = (iui_clip_rect) {0, 0, UINT16_MAX, UINT16_MAX};
-    ctx->renderer.set_clip_rect(0, 0, UINT16_MAX, UINT16_MAX,
-                                ctx->renderer.user);
 }
 
 void iui_end_frame(iui_context *ctx)
@@ -812,10 +849,21 @@ void iui_end_frame(iui_context *ctx)
     /* Reset per-frame input edges (event.c) */
     iui_input_frame_begin(ctx);
 
-    /* Reset scroll wheel delta for next frame (consumed by iui_scroll_begin) */
+    /* Reset scroll state for next frame */
     ctx->scroll_wheel_dx = 0;
     ctx->scroll_wheel_dy = 0;
     ctx->active_scroll = NULL;
+
+    /* Each begin_window/end_window pair must balance its clip push/pop. */
+    assert(ctx->clip.depth == 0 && "leaked clip region across frame boundary");
+    if (ctx->clip.depth != 0) {
+        /* Release recovery: reset both logical and renderer clip state so the
+         * next frame starts clean rather than with stale clipping applied. */
+        ctx->clip.depth = 0;
+        ctx->current_clip = (iui_clip_rect) {0, 0, UINT16_MAX, UINT16_MAX};
+        ctx->renderer.set_clip_rect(0, 0, UINT16_MAX, UINT16_MAX,
+                                    ctx->renderer.user);
+    }
 
     /* Flush batched draw commands */
     iui_batch_flush(ctx);

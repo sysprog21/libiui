@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "internal.h"
 
 /* Card container */
@@ -311,23 +312,38 @@ iui_rect_t iui_scroll_begin(iui_context *ctx,
     if (!ctx || !state)
         return viewport;
 
-    /* Get viewport position from current layout */
+    /* Resolve auto-sizing: 0 or negative means "layout width/height + offset".
+     * 0.0f = fill available, -N.0f = fill minus N pixels (e.g. sibling gap).
+     */
+    if (view_w <= 0.0f)
+        view_w = fmaxf(0.0f, ctx->layout.width + view_w);
+    if (view_h <= 0.0f)
+        view_h = fmaxf(0.0f, ctx->layout.height + view_h);
+
+    assert(
+        !ctx->active_scroll &&
+        "nested scroll regions are not supported; call iui_scroll_end first");
+    assert(view_w <= ctx->layout.width + 0.5f &&
+           "scroll view_w exceeds layout width; use 0.f for auto");
+
     viewport.x = ctx->layout.x;
     viewport.y = ctx->layout.y;
     viewport.width = view_w;
     viewport.height = view_h;
 
-    /* Store viewport for later use */
     ctx->scroll_viewport = viewport;
     ctx->active_scroll = state;
 
-    /* Record starting layout position for content measurement */
+    /* Save layout origin for restoration in iui_scroll_end */
     ctx->scroll_content_start_x = ctx->layout.x;
     ctx->scroll_content_start_y = ctx->layout.y;
+    ctx->scroll_content_start_width = ctx->layout.width;
 
-    /* Clamp scroll position to valid range using previous content size
-     * (content size from previous frame; will be updated in iui_scroll_end)
-     */
+    /* Unconditionally reserve scrollbar space to avoid a one-frame width
+     * pop when content first exceeds view_h. */
+    ctx->layout.width = fmaxf(0.f, view_w - IUI_SCROLLBAR_W);
+
+    /* Clamp scroll to valid range (content size from previous frame) */
     float max_scroll_x = fmaxf(0.f, state->content_w - view_w);
     float max_scroll_y = fmaxf(0.f, state->content_h - view_h);
     state->scroll_x = clamp_float(0.f, max_scroll_x, state->scroll_x);
@@ -337,17 +353,16 @@ iui_rect_t iui_scroll_begin(iui_context *ctx,
     if (in_rect(&viewport, ctx->mouse_pos)) {
         state->scroll_x -= ctx->scroll_wheel_dx;
         state->scroll_y -= ctx->scroll_wheel_dy;
-        /* Re-clamp after applying wheel input */
         state->scroll_x = clamp_float(0.f, max_scroll_x, state->scroll_x);
         state->scroll_y = clamp_float(0.f, max_scroll_y, state->scroll_y);
-        /* Consume wheel delta so overlapping scroll regions don't double-apply
-         */
+        /* Consume delta to prevent overlapping scroll regions from reusing */
         ctx->scroll_wheel_dx = 0;
         ctx->scroll_wheel_dy = 0;
     }
 
-    /* Push clip rect for viewport - fail if stack overflow */
+    /* Push clip rect for viewport; rollback on overflow */
     if (!iui_push_clip(ctx, viewport)) {
+        ctx->layout.width = ctx->scroll_content_start_width;
         ctx->active_scroll = NULL;
         return (iui_rect_t) {0, 0, 0, 0};
     }
@@ -366,45 +381,40 @@ bool iui_scroll_end(iui_context *ctx, iui_scroll_state *state)
     if (!ctx || !state)
         return false;
 
-    /* Measure content size by comparing current layout.y with starting position
-     * This assumes vertical-only content flow (which is the common case).
-     */
+    /* Guard against calls when iui_scroll_begin failed (returned empty rect).
+     * On failure, active_scroll is NULL; proceeding would pop an unrelated
+     * clip and corrupt the stack. */
+    if (ctx->active_scroll != state)
+        return false;
+
+    /* Measure content size (assumes vertical-only content flow) */
     float content_height =
         (ctx->layout.y + state->scroll_y) - ctx->scroll_content_start_y;
     float content_width =
         ctx->scroll_viewport.width; /* Default to viewport width */
 
-    /* Update state with measured content size */
     state->content_h = fmaxf(content_height, 0.f);
     state->content_w = fmaxf(content_width, 0.f);
 
-    /* Restore layout position to after the viewport */
+    /* Restore layout to after the viewport */
     ctx->layout.x = ctx->scroll_content_start_x;
+    ctx->layout.width = ctx->scroll_content_start_width;
     ctx->layout.y = ctx->scroll_content_start_y + ctx->scroll_viewport.height +
                     ctx->padding;
 
-    /* Pop clip rect */
-    iui_pop_clip(ctx);
-
-    /* Clear active scroll since processing is complete */
     ctx->active_scroll = NULL;
 
-    /* Determine if scrolling is active (content larger than viewport) */
     bool scrollable_x = state->content_w > ctx->scroll_viewport.width;
     bool scrollable_y = state->content_h > ctx->scroll_viewport.height;
 
-    /* Clear scroll_dragging if this scroll region is being dragged but
-     * scrollbar disappears (content shrunk). Runs outside scrollable_y block
-     * intentionally.
-     */
+    /* Release drag if scrollbar disappears (content shrunk) */
     if (ctx->scroll_dragging == state &&
         (ctx->mouse_released & IUI_MOUSE_LEFT)) {
         ctx->scroll_dragging = NULL;
     }
 
-    /* Draw vertical scrollbar if content is taller than viewport */
     if (scrollable_y) {
-        float scrollbar_width = 8.f;
+        float scrollbar_width = IUI_SCROLLBAR_W;
         float track_height = ctx->scroll_viewport.height;
         float thumb_height =
             fmaxf(20.f, track_height *
@@ -415,7 +425,6 @@ bool iui_scroll_end(iui_context *ctx, iui_scroll_state *state)
             (max_scroll > 0.f) ? state->scroll_y / max_scroll : 0.f;
         float thumb_y = ctx->scroll_viewport.y + thumb_y_range * scroll_ratio;
 
-        /* Track rect */
         iui_rect_t track_rect = {
             .x = ctx->scroll_viewport.x + ctx->scroll_viewport.width -
                  scrollbar_width,
@@ -424,7 +433,6 @@ bool iui_scroll_end(iui_context *ctx, iui_scroll_state *state)
             .height = track_height,
         };
 
-        /* Thumb rect */
         iui_rect_t thumb_rect = {
             .x = track_rect.x,
             .y = thumb_y,
@@ -432,12 +440,9 @@ bool iui_scroll_end(iui_context *ctx, iui_scroll_state *state)
             .height = thumb_height,
         };
 
-        /* Handle scrollbar drag interaction */
         bool is_dragging = (ctx->scroll_dragging == state);
 
-        /* Only left mouse button starts drag (consistent with other
-         * interactions)
-         */
+        /* Left mouse button starts drag */
         if ((ctx->mouse_pressed & IUI_MOUSE_LEFT) &&
             in_rect(&thumb_rect, ctx->mouse_pos)) {
             ctx->scroll_dragging = state;
@@ -445,29 +450,22 @@ bool iui_scroll_end(iui_context *ctx, iui_scroll_state *state)
             is_dragging = true;
         }
 
-        /* Handle ongoing drag (left button held) */
         if (is_dragging && (ctx->mouse_held & IUI_MOUSE_LEFT)) {
-            /* Calculate new thumb position based on mouse Y */
             float new_thumb_y = ctx->mouse_pos.y - ctx->scroll_drag_offset;
-            /* Clamp thumb to track bounds */
             new_thumb_y = clamp_float(
                 track_rect.y, track_rect.y + thumb_y_range, new_thumb_y);
-            /* Convert thumb position to scroll position */
             float new_ratio = (thumb_y_range > 0.f)
                                   ? (new_thumb_y - track_rect.y) / thumb_y_range
                                   : 0.f;
             state->scroll_y = new_ratio * max_scroll;
-            /* Update thumb_y for rendering */
             thumb_y = new_thumb_y;
             thumb_rect.y = thumb_y;
         }
 
-        /* Draw track */
         ctx->renderer.draw_box(track_rect, scrollbar_width * 0.5f,
                                ctx->colors.surface_container_high,
                                ctx->renderer.user);
 
-        /* Draw thumb (highlight if dragging or hovered) */
         uint32_t thumb_color = ctx->colors.outline;
         if (is_dragging) {
             thumb_color = ctx->colors.primary;
@@ -477,6 +475,9 @@ bool iui_scroll_end(iui_context *ctx, iui_scroll_state *state)
         ctx->renderer.draw_box(thumb_rect, scrollbar_width * 0.5f, thumb_color,
                                ctx->renderer.user);
     }
+
+    /* Pop after scrollbar draw so the thumb stays bounded by the viewport */
+    iui_pop_clip(ctx);
 
     return scrollable_x || scrollable_y;
 }
@@ -627,12 +628,12 @@ bool iui_bottom_sheet_begin(iui_context *ctx,
     iui_rect_t block_rect = {0, sheet_y, screen_width, current_height};
     iui_register_blocking_region(ctx, block_rect);
 
-    /* Push clip for content */
     float content_y = sheet_y + IUI_BOTTOM_SHEET_DRAG_HANDLE_MARGIN * 2.f +
                       IUI_BOTTOM_SHEET_DRAG_HANDLE_HEIGHT;
     iui_rect_t content_rect = {0, content_y, screen_width,
                                current_height - (content_y - sheet_y)};
-    iui_push_clip(ctx, content_rect);
+    if (!iui_push_clip(ctx, content_rect))
+        return false; /* clip overflow: abort sheet content */
 
     return true;
 }
@@ -972,10 +973,11 @@ int iui_banner(iui_context *ctx, const iui_banner_options *options)
     if (msg_max_width < ctx->font_height)
         msg_max_width = ctx->font_height;
     iui_rect_t msg_clip = {content_x, banner_rect.y, msg_max_width, height};
-    iui_push_clip(ctx, msg_clip);
-    iui_internal_draw_text(ctx, content_x, text_y, options->message,
-                           ctx->colors.on_surface);
-    iui_pop_clip(ctx);
+    if (iui_push_clip(ctx, msg_clip)) {
+        iui_internal_draw_text(ctx, content_x, text_y, options->message,
+                               ctx->colors.on_surface);
+        iui_pop_clip(ctx);
+    }
 
     if (options->action2) {
         if (draw_banner_action(ctx, &action_x, banner_rect.y, height,
