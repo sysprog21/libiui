@@ -3,7 +3,7 @@
  *
  * This backend provides direct Canvas 2D API integration without SDL2
  * dependency, reducing binary size. Key features:
- * - Framebuffer-based rendering (ARGB32 -> Canvas ImageData)
+ * - Direct Canvas 2D command-based rendering
  * - Browser-native event handling via exported C functions
  * - Single-threaded design (WebAssembly execution model)
  * - Vector font path rendering to Canvas 2D context
@@ -27,12 +27,6 @@
 
 /* WebAssembly port context */
 struct iui_port_ctx {
-    /* Framebuffer (ARGB32 format, same as Canvas ImageData after conversion)
-     * Note: Framebuffer is allocated at LOGICAL size (width x height).
-     * All rendering is done in logical coordinates - no DPI scaling in C code.
-     * JavaScript handles any HiDPI scaling via CSS canvas sizing.
-     */
-    uint32_t *framebuffer;
     int width, height; /* Logical width/height */
 
     /* State */
@@ -65,21 +59,25 @@ struct iui_port_ctx {
  */
 static iui_port_ctx *g_wasm_ctx = NULL;
 
-/* NOTE: Framebuffer rendering helpers (fb_set_pixel, fb_hline, fb_rounded_rect,
- * fb_line_aa, fb_line, fb_fill_circle, fb_stroke_circle, fb_arc) have been
- * consolidated into port-sw.h as shared inline functions.
- */
-
 /* Renderer Callbacks (iui_renderer_t implementation) */
+
+/* clang-format off */
 
 static void wasm_draw_box(iui_rect_t rect,
                           float radius,
                           uint32_t srgb_color,
                           void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_raster_rounded_rect(&ctx->raster, rect.x, rect.y, rect.width,
-                            rect.height, radius, srgb_color);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.fillStyle = IuiCanvas.parseColor($4);
+            ctx.beginPath();
+            if ($5 > 0)
+                ctx.roundRect($0, $1, $2, $3, $5);
+            else
+                ctx.rect($0, $1, $2, $3);
+            ctx.fill();
+    }, rect.x, rect.y, rect.width, rect.height, srgb_color, radius);
 }
 
 static void wasm_set_clip_rect(uint16_t min_x,
@@ -88,8 +86,14 @@ static void wasm_set_clip_rect(uint16_t min_x,
                                uint16_t max_y,
                                void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_raster_set_clip(&ctx->raster, min_x, min_y, max_x, max_y);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.restore();
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect($0, $1, $2 - $0, $3 - $1);
+            ctx.clip();
+    }, min_x, min_y, max_x, max_y);
 }
 
 static void wasm_draw_line(float x0,
@@ -100,8 +104,16 @@ static void wasm_draw_line(float x0,
                            uint32_t srgb_color,
                            void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_raster_line(&ctx->raster, x0, y0, x1, y1, width, srgb_color);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.strokeStyle = IuiCanvas.parseColor($5);
+            ctx.lineWidth = $4;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo($0, $1);
+            ctx.lineTo($2, $3);
+            ctx.stroke();
+    }, x0, y0, x1, y1, width, srgb_color);
 }
 
 static void wasm_draw_circle(float cx,
@@ -112,14 +124,20 @@ static void wasm_draw_circle(float cx,
                              float stroke_width,
                              void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-
-    if (fill_color != 0)
-        iui_raster_circle_fill(&ctx->raster, cx, cy, radius, fill_color);
-
-    if (stroke_color != 0 && stroke_width > 0.f)
-        iui_raster_circle_stroke(&ctx->raster, cx, cy, radius, stroke_width,
-                                 stroke_color);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.beginPath();
+            ctx.arc($0, $1, $2, 0, Math.PI * 2);
+            if ($3 !== 0) {
+                ctx.fillStyle = IuiCanvas.parseColor($3);
+                ctx.fill();
+            }
+            if ($4 !== 0 && $5 > 0) {
+                ctx.strokeStyle = IuiCanvas.parseColor($4);
+                ctx.lineWidth = $5;
+                ctx.stroke();
+            }
+    }, cx, cy, radius, fill_color, stroke_color, stroke_width);
 }
 
 static void wasm_draw_arc(float cx,
@@ -131,23 +149,34 @@ static void wasm_draw_arc(float cx,
                           uint32_t srgb_color,
                           void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_raster_arc(&ctx->raster, cx, cy, radius, start_angle, end_angle, width,
-                   srgb_color);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.strokeStyle = IuiCanvas.parseColor($6);
+            ctx.lineWidth = $5;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.arc($0, $1, $2, $3, $4);
+            ctx.stroke();
+    }, cx, cy, radius, start_angle, end_angle, width, srgb_color);
 }
 
 /* Vector Font Callbacks (iui_vector_t implementation) */
 
 static void wasm_path_move(float x, float y, void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_path_move_to(&ctx->path, x, y);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.beginPath();
+            ctx.moveTo($0, $1);
+    }, x, y);
 }
 
 static void wasm_path_line(float x, float y, void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_path_line_to(&ctx->path, x, y);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.lineTo($0, $1);
+    }, x, y);
 }
 
 static void wasm_path_curve(float x1,
@@ -158,24 +187,25 @@ static void wasm_path_curve(float x1,
                             float y3,
                             void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-    iui_path_curve_to(&ctx->path, x1, y1, x2, y2, x3, y3);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.bezierCurveTo($0, $1, $2, $3, $4, $5);
+    }, x1, y1, x2, y2, x3, y3);
 }
 
 static void wasm_path_stroke(float width, uint32_t color, void *user)
 {
-    iui_port_ctx *ctx = (iui_port_ctx *) user;
-
-    if (ctx->path.count < 2) {
-        iui_path_reset(&ctx->path);
-        return;
-    }
-
-    /* Use SDL2-compatible path stroke with round caps and consistent AA */
-    iui_raster_path_stroke(&ctx->raster, &ctx->path, width, color);
-
-    iui_path_reset(&ctx->path);
+    EM_ASM({
+            const ctx = IuiCanvas.getContext();
+            ctx.strokeStyle = IuiCanvas.parseColor($1);
+            ctx.lineWidth = $0;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.stroke();
+    }, width, color);
 }
+
+/* clang-format on */
 
 /* Port Interface Implementation (iui_port_t) */
 
@@ -193,15 +223,7 @@ static iui_port_ctx *wasm_init(int width, int height, const char *title)
     ctx->running = true;
     ctx->exit_requested = false;
 
-    /* Allocate framebuffer (ARGB32 format) */
-    ctx->framebuffer = (uint32_t *) calloc(width * height, sizeof(uint32_t));
-    if (!ctx->framebuffer) {
-        free(ctx);
-        return NULL;
-    }
 
-    /* Initialize rasterizer context */
-    iui_raster_init(&ctx->raster, ctx->framebuffer, width, height);
 
     /* Initialize path state */
     iui_path_reset(&ctx->path);
@@ -233,8 +255,7 @@ static void wasm_shutdown(iui_port_ctx *ctx)
     /* Cleanup Canvas via JavaScript */
     EM_ASM({ IuiCanvas.destroy(); });
 
-    if (ctx->framebuffer)
-        free(ctx->framebuffer);
+
 
     free(ctx);
     g_wasm_ctx = NULL;
@@ -260,11 +281,6 @@ static void wasm_configure(iui_port_ctx *ctx)
     ctx->vector_ops.path_line = wasm_path_line;
     ctx->vector_ops.path_curve = wasm_path_curve;
     ctx->vector_ops.path_stroke = wasm_path_stroke;
-
-    /* Pass framebuffer pointer to JavaScript */
-    /* clang-format off */
-    EM_ASM({ IuiCanvas.setFramebufferPtr($0); }, ctx->framebuffer);
-    /* clang-format on */
 }
 
 static bool wasm_poll_events(iui_port_ctx *ctx)
@@ -305,25 +321,29 @@ static void wasm_get_input(iui_port_ctx *ctx, iui_port_input *input)
 
 static void wasm_begin_frame(iui_port_ctx *ctx)
 {
-    if (!ctx || !ctx->framebuffer)
+    if (!ctx)
         return;
 
-    /* Clear framebuffer with dark background (ARGB: 0xFF282C34) */
-    iui_raster_clear(&ctx->raster, 0xFF282C34);
 
-    /* Reset clip to full framebuffer */
-    iui_raster_reset_clip(&ctx->raster);
+    /* clang-format off */
+    /* Reset canvas transform, clear with background color, and prepare clip stack */
+    EM_ASM({
+            const context = IuiCanvas.getContext();
+            if (context) {
+                const dpr = window.devicePixelRatio || 1;
+                context.setTransform(dpr, 0, 0, dpr, 0, 0);
+                context.fillStyle = "#282c34";
+                context.fillRect(0, 0, $0, $1);
+                context.save();
+            }
+    }, ctx->width, ctx->height);
+    /* clang-format on */
 }
 
 static void wasm_end_frame(iui_port_ctx *ctx)
 {
     if (!ctx)
         return;
-
-    /* Notify JavaScript to update canvas */
-    /* clang-format off */
-    EM_ASM({ IuiCanvas.updateCanvas(); });
-    /* clang-format on */
 }
 
 static iui_renderer_t wasm_get_renderer_callbacks(iui_port_ctx *ctx)
@@ -401,12 +421,7 @@ static void wasm_set_clipboard_text(iui_port_ctx *ctx, const char *text)
     /* Clipboard access in browser requires async API - not implemented */
 }
 
-static void *wasm_get_native_renderer(iui_port_ctx *ctx)
-{
-    (void) ctx;
-    /* No native renderer in WebAssembly - return framebuffer pointer */
-    return ctx ? ctx->framebuffer : NULL;
-}
+
 
 /* Exported Functions for JavaScript Event Injection */
 
@@ -490,13 +505,7 @@ void iui_wasm_char(int codepoint)
     }
 }
 
-EMSCRIPTEN_KEEPALIVE
-uint32_t *iui_wasm_get_framebuffer(void)
-{
-    if (!g_wasm_ctx)
-        return NULL;
-    return g_wasm_ctx->framebuffer;
-}
+
 
 EMSCRIPTEN_KEEPALIVE
 int iui_wasm_get_width(void)
@@ -541,5 +550,5 @@ const iui_port_t g_iui_port = {
     .is_window_visible = wasm_is_window_visible,
     .get_clipboard_text = wasm_get_clipboard_text,
     .set_clipboard_text = wasm_set_clipboard_text,
-    .get_native_renderer = wasm_get_native_renderer,
+    .get_native_renderer = NULL,
 };

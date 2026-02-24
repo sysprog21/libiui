@@ -9,13 +9,18 @@
 const IuiCanvas = {
     canvas: null,
     ctx: null,
-    imageData: null,
-    width: 0,
-    height: 0,
-    /* Cached framebuffer pointer for direct memory access */
-    fbPtr: 0,
-    fbBuffer: null,
     dpr: 1, /* Device pixel ratio */
+
+    getContext: function () {
+        return this.ctx;
+    },
+    parseColor: function (c) {
+        const a = (c >> 24) & 0xFF;
+        const r = (c >> 16) & 0xFF;
+        const g = (c >> 8) & 0xFF;
+        const b = c & 0xFF;
+        return `rgba(${r},${g},${b},${a / 255})`;
+    },
 
     /* Initialize Canvas context */
     init: function (width, height) {
@@ -48,7 +53,7 @@ const IuiCanvas = {
         this.ctx.scale(this.dpr, this.dpr);
 
         /* Create ImageData for framebuffer transfer (logical size) */
-        this.imageData = this.ctx.createImageData(width, height);
+
 
         /* Setup event listeners */
         this.setupEvents();
@@ -146,101 +151,13 @@ const IuiCanvas = {
         }
     },
 
-    /* Set framebuffer pointer from WASM */
-    setFramebufferPtr: function (ptr) {
-        this.fbPtr = ptr;
-        console.log("[IuiCanvas] Framebuffer pointer set: " + ptr);
-        if (typeof addConsoleLine === "function") {
-            addConsoleLine("Framebuffer ptr: " + ptr, false);
-        }
-    },
 
-    /* Update Canvas from framebuffer */
-    updateCanvas: function () {
-        if (!this.fbPtr || !this.ctx || !this.imageData) {
-            return;
-        }
-
-        /* Access WASM memory - try multiple methods for different Emscripten versions */
-        var wasmBuffer = null;
-
-        /* Method 1: Direct HEAPU8 buffer (most common) */
-        if (Module.HEAPU8 && Module.HEAPU8.buffer) {
-            wasmBuffer = Module.HEAPU8.buffer;
-        }
-        /* Method 2: wasmMemory object */
-        else if (Module.wasmMemory && Module.wasmMemory.buffer) {
-            wasmBuffer = Module.wasmMemory.buffer;
-        }
-        /* Method 3: asm.memory (older Emscripten) */
-        else if (Module.asm && Module.asm.memory && Module.asm.memory.buffer) {
-            wasmBuffer = Module.asm.memory.buffer;
-        }
-        /* Method 4: Direct memory export */
-        else if (typeof wasmMemory !== "undefined" && wasmMemory.buffer) {
-            wasmBuffer = wasmMemory.buffer;
-        }
-
-        if (!wasmBuffer) {
-            /* Log diagnostic info only once per second to avoid spam */
-            if (!this._lastMemError || Date.now() - this._lastMemError > 1000) {
-                this._lastMemError = Date.now();
-                console.error("[IuiCanvas] Cannot access WASM memory. Available:",
-                    "HEAPU8=" + (typeof Module.HEAPU8),
-                    "wasmMemory=" + (typeof Module.wasmMemory),
-                    "asm=" + (typeof Module.asm));
-            }
-            return;
-        }
-
-        /* Create view into framebuffer (re-create each frame in case memory grows) */
-        var pixelCount = this.width * this.height;
-        var fb = new Uint32Array(wasmBuffer, this.fbPtr, pixelCount);
-
-        /* Convert ARGB32 to RGBA for Canvas ImageData */
-        var data = this.imageData.data;
-        for (var i = 0; i < pixelCount; i++) {
-            var argb = fb[i];
-            var offset = i * 4;
-            data[offset + 0] = (argb >> 16) & 0xFF; /* R */
-            data[offset + 1] = (argb >> 8) & 0xFF;  /* G */
-            data[offset + 2] = argb & 0xFF;         /* B */
-            data[offset + 3] = (argb >> 24) & 0xFF; /* A */
-        }
-
-        /* For HiDPI: use offscreen canvas at logical size, then draw scaled to main canvas */
-        if (this.dpr > 1) {
-            /* Create offscreen canvas if needed */
-            if (!this.offscreenCanvas) {
-                this.offscreenCanvas = document.createElement("canvas");
-                this.offscreenCanvas.width = this.width;
-                this.offscreenCanvas.height = this.height;
-                this.offscreenCtx = this.offscreenCanvas.getContext("2d");
-            }
-            /* Put image data to offscreen canvas */
-            this.offscreenCtx.putImageData(this.imageData, 0, 0);
-            /* Draw scaled to main canvas with smoothing for better text quality */
-            this.ctx.save();
-            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-            /* Enable smoothing for better text rendering on HiDPI */
-            this.ctx.imageSmoothingEnabled = true;
-            this.ctx.imageSmoothingQuality = "high";
-            this.ctx.drawImage(this.offscreenCanvas, 0, 0, this.width, this.height,
-                               0, 0, this.canvas.width, this.canvas.height);
-            this.ctx.restore();
-        } else {
-            /* Non-HiDPI: direct putImageData */
-            this.ctx.putImageData(this.imageData, 0, 0);
-        }
-    },
 
     /* Cleanup */
     destroy: function () {
         this.canvas = null;
         this.ctx = null;
         this.imageData = null;
-        this.fbPtr = 0;
-        this.fbBuffer = null;
     }
 };
 
