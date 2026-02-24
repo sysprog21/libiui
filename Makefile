@@ -153,7 +153,7 @@ ifeq ($(CONFIG_DEMO_EXAMPLE),y)
     ifeq ($(CC_IS_EMCC),1)
         libiui_example_cflags-y += -Oz
         libiui_example_ldflags-y += \
-            -sEXPORTED_FUNCTIONS='["_main","_iui_wasm_mouse_motion","_iui_wasm_mouse_button","_iui_wasm_scroll","_iui_wasm_key","_iui_wasm_char","_iui_wasm_get_framebuffer","_iui_wasm_get_width","_iui_wasm_get_height","_iui_wasm_shutdown"]' \
+            -sEXPORTED_FUNCTIONS='["_main","_iui_wasm_mouse_motion","_iui_wasm_mouse_button","_iui_wasm_scroll","_iui_wasm_key","_iui_wasm_char","_iui_wasm_get_width","_iui_wasm_get_height","_iui_wasm_shutdown"]' \
             -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPU8","HEAPU32","wasmMemory"]' \
             -sALLOW_MEMORY_GROWTH=1 \
             -sASYNCIFY

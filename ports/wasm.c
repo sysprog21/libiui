@@ -27,8 +27,6 @@
 
 /* WebAssembly port context */
 struct iui_port_ctx {
-    /* Deprecated: Framebuffer is no longer used for Direct Rendering path */
-    uint32_t *framebuffer;
     int width, height; /* Logical width/height */
 
     /* State */
@@ -225,15 +223,7 @@ static iui_port_ctx *wasm_init(int width, int height, const char *title)
     ctx->running = true;
     ctx->exit_requested = false;
 
-    /* Allocate framebuffer (ARGB32 format) */
-    ctx->framebuffer = (uint32_t *) calloc(width * height, sizeof(uint32_t));
-    if (!ctx->framebuffer) {
-        free(ctx);
-        return NULL;
-    }
 
-    /* Initialize rasterizer context */
-    iui_raster_init(&ctx->raster, ctx->framebuffer, width, height);
 
     /* Initialize path state */
     iui_path_reset(&ctx->path);
@@ -265,8 +255,7 @@ static void wasm_shutdown(iui_port_ctx *ctx)
     /* Cleanup Canvas via JavaScript */
     EM_ASM({ IuiCanvas.destroy(); });
 
-    if (ctx->framebuffer)
-        free(ctx->framebuffer);
+
 
     free(ctx);
     g_wasm_ctx = NULL;
@@ -292,11 +281,6 @@ static void wasm_configure(iui_port_ctx *ctx)
     ctx->vector_ops.path_line = wasm_path_line;
     ctx->vector_ops.path_curve = wasm_path_curve;
     ctx->vector_ops.path_stroke = wasm_path_stroke;
-
-    /* Pass framebuffer pointer to JavaScript */
-    /* clang-format off */
-    EM_ASM({ IuiCanvas.setFramebufferPtr($0); }, ctx->framebuffer);
-    /* clang-format on */
 }
 
 static bool wasm_poll_events(iui_port_ctx *ctx)
@@ -337,7 +321,7 @@ static void wasm_get_input(iui_port_ctx *ctx, iui_port_input *input)
 
 static void wasm_begin_frame(iui_port_ctx *ctx)
 {
-    if (!ctx || !ctx->framebuffer)
+    if (!ctx)
         return;
 
 
@@ -437,12 +421,7 @@ static void wasm_set_clipboard_text(iui_port_ctx *ctx, const char *text)
     /* Clipboard access in browser requires async API - not implemented */
 }
 
-static void *wasm_get_native_renderer(iui_port_ctx *ctx)
-{
-    (void) ctx;
-    /* No native renderer in WebAssembly - return framebuffer pointer */
-    return ctx ? ctx->framebuffer : NULL;
-}
+
 
 /* Exported Functions for JavaScript Event Injection */
 
@@ -526,13 +505,7 @@ void iui_wasm_char(int codepoint)
     }
 }
 
-EMSCRIPTEN_KEEPALIVE
-uint32_t *iui_wasm_get_framebuffer(void)
-{
-    if (!g_wasm_ctx)
-        return NULL;
-    return g_wasm_ctx->framebuffer;
-}
+
 
 EMSCRIPTEN_KEEPALIVE
 int iui_wasm_get_width(void)
@@ -577,5 +550,5 @@ const iui_port_t g_iui_port = {
     .is_window_visible = wasm_is_window_visible,
     .get_clipboard_text = wasm_get_clipboard_text,
     .set_clipboard_text = wasm_set_clipboard_text,
-    .get_native_renderer = wasm_get_native_renderer,
+    .get_native_renderer = NULL,
 };
