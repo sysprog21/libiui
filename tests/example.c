@@ -124,6 +124,16 @@ static void calc_operation(calculator_state_t *calc, char op);
 static void calc_equals(calculator_state_t *calc);
 #endif /* CONFIG_DEMO_CALCULATOR */
 
+/* Standard demo window position: 10dp gap right of libIUI Demo (x=30+340=370).
+ * y=30 keeps all windows top-aligned with the control panel.
+ * These are used by all demo windows, not just calculator. */
+#define DEMO_WIN_X 380
+#define DEMO_WIN_Y 30
+
+/* Forward declaration so all draw functions can call get_demo_window_height()
+ * without knowing the full implementation, which lives after the constants. */
+static float get_demo_window_height(void);
+
 #ifdef CONFIG_DEMO_CALCULATOR
 /* Calculator Implementation */
 
@@ -224,15 +234,6 @@ static void calc_equals(calculator_state_t *calc)
     calc->cursor = strlen(calc->display);
     calc->new_input = true;
 }
-
-/* Standard demo window position: 10dp gap right of libIUI Demo (x=30+340=370).
- * y=30 keeps all windows top-aligned with the control panel. */
-#define DEMO_WIN_X 380
-#define DEMO_WIN_Y 30
-
-/* Forward declaration so all draw functions can call get_demo_window_height()
- * without knowing the full implementation, which lives after the constants. */
-static float get_demo_window_height(void);
 
 static void draw_calculator_window(iui_context *ui, calculator_state_t *calc)
 {
