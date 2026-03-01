@@ -7,22 +7,32 @@ mainmenu "libiui Configuration"
 menu "Toolchain Configuration"
 
 # Compiler detection using scripts/detect-compiler.py
-config COMPILER_TYPE
-    string
-    default "$(shell,scripts/detect-compiler.py 2>/dev/null || echo Unknown)"
-
+# Uses $(python,...) for portable boolean checks (no shell dependency).
+# run() executes argv without a shell; assert converts True/False to y/n.
+# sys.executable ensures the script runs under the same Python as Kconfiglib.
 config CC_IS_EMCC
-    def_bool $(shell,scripts/detect-compiler.py --is Emscripten 2>/dev/null)
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'Emscripten'))
 
 config CC_IS_CLANG
-    def_bool $(shell,scripts/detect-compiler.py --is Clang 2>/dev/null)
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'Clang'))
 
 config CC_IS_GCC
-    def_bool $(shell,scripts/detect-compiler.py --is GCC 2>/dev/null)
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'GCC'))
 
-# Check if emcc is available in PATH (for defconfig generation)
+# Derive compiler type string from the boolean checks above.
+# $(python,...) only returns y/n, so string-valued configs use conditionals.
+# Precedence: Emscripten > Clang > GCC (emcc is Clang-based, so check it first).
+config COMPILER_TYPE
+    string
+    default "Emscripten" if CC_IS_EMCC
+    default "Clang" if CC_IS_CLANG
+    default "GCC" if CC_IS_GCC
+    default "Unknown"
+
+# Check if emcc is available in PATH (for defconfig generation).
+# In-process via shutil.which() -- no subprocess needed.
 config HAVE_EMCC
-    def_bool $(shell,scripts/detect-compiler.py --have-emcc 2>/dev/null)
+    def_bool $(python,assert shutil.which('emcc'))
 
 comment "Build mode: WebAssembly (Emscripten)"
     depends on CC_IS_EMCC
@@ -43,7 +53,7 @@ endmenu
 config HAVE_SDL2
     bool
     default n if CC_IS_EMCC
-    default $(shell,pkg-config --exists sdl2 2>/dev/null && echo y || echo n) if !CC_IS_EMCC
+    default $(python,assert shutil.which('pkg-config') and run('pkg-config', '--exists', 'sdl2')) if !CC_IS_EMCC
 
 # Backend Selection (mutual exclusion)
 
