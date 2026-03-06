@@ -599,8 +599,9 @@ bool iui_bottom_sheet_begin(iui_context *ctx,
 
     /* Track component for MD3 validation (use logical height, not padded rect)
      */
-    iui_rect_t validation_rect = {0, sheet_y, screen_width, current_height};
-    IUI_MD3_TRACK_BOTTOM_SHEET(validation_rect, IUI_BOTTOM_SHEET_CORNER_RADIUS);
+    IUI_MD3_TRACK_BOTTOM_SHEET(
+        ((iui_rect_t) {0, sheet_y, screen_width, current_height}),
+        IUI_BOTTOM_SHEET_CORNER_RADIUS);
 
     /* Draw drag handle */
     float handle_x = (screen_width - IUI_BOTTOM_SHEET_DRAG_HANDLE_WIDTH) * 0.5f;
