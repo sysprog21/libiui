@@ -100,7 +100,7 @@ jobs:
         continue-on-error: true
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-screenshots
           path: build/*.png
@@ -171,7 +171,7 @@ jobs:
       - name: Prepare deployment
         run: .ci/build-wasm.sh deploy-prep
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-build
           path: deploy/
@@ -183,6 +183,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
@@ -190,10 +191,48 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Wait for automatic Pages build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The automatic pages-build-deployment workflow (Jekyll) runs on
+          # every push and renders README.md. Wait for it to finish so our
+          # WASM deployment is always the final one.
+          #
+          # Filter by commit SHA to wait only for the run from this push.
+          sleep 10
+          WAITED=false
+          for i in $(seq 1 30); do
+            RUNNING=$(gh run list -R "${{ github.repository }}" \
+              --workflow=pages-build-deployment \
+              --commit "${{ github.sha }}" \
+              --json status \
+              --jq '[.[] | select(.status != "completed")] | length' \
+              2>/dev/null) || RUNNING="error"
+            if [ "$RUNNING" = "error" ]; then
+              echo "Could not query pages-build-deployment (may be disabled)"
+              WAITED=true
+              break
+            fi
+            if [ "$RUNNING" = "0" ]; then
+              echo "No competing Pages deployment running for this commit"
+              WAITED=true
+              break
+            fi
+            echo "Waiting for automatic Pages build... (${i}/30)"
+            sleep 5
+          done
+          if [ "$WAITED" = false ]; then
+            echo "::error::Timed out waiting for pages-build-deployment to finish"
+            exit 1
+          fi
       - uses: actions/download-artifact@v6
         with:
           name: wasm-build
           path: deploy/
+      - name: Disable Jekyll processing
+        run: touch deploy/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
