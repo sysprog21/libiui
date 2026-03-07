@@ -449,7 +449,7 @@ static void draw_vector_demo_window(iui_context *ui, float progress_value)
     /* Concentric circles with rotating dots */
     float cx3 = area.x + 310.f;
     float cy3 = area.y + 55.f;
-    uint32_t ring_colors[] = {COLOR_PURPLE, COLOR_BLUE, COLOR_CYAN};
+    const uint32_t ring_colors[] = {COLOR_PURPLE, COLOR_BLUE, COLOR_CYAN};
 
     for (int ring = 0; ring < 3; ring++) {
         float r = 20.f + ring * 15.f;
@@ -506,9 +506,9 @@ static void draw_vector_demo_window(iui_context *ui, float progress_value)
     /* Starburst */
     float cx5 = area.x + 180.f;
     float cy5 = area.y + 160.f;
-    uint32_t star_colors[] = {COLOR_RED,    COLOR_ORANGE, COLOR_YELLOW,
-                              COLOR_GREEN,  COLOR_CYAN,   COLOR_BLUE,
-                              COLOR_PURPLE, COLOR_PINK};
+    const uint32_t star_colors[] = {COLOR_RED,    COLOR_ORANGE, COLOR_YELLOW,
+                                    COLOR_GREEN,  COLOR_CYAN,   COLOR_BLUE,
+                                    COLOR_PURPLE, COLOR_PINK};
     for (int i = 0; i < 16; i++) {
         float angle =
             (float) i * (float) M_PI / 8.f + progress_value * (float) M_PI;
@@ -526,7 +526,8 @@ static void draw_vector_demo_window(iui_context *ui, float progress_value)
 
     prev_x = bx;
     prev_y = by + bh;
-    uint32_t colors[] = {COLOR_PURPLE, COLOR_BLUE, COLOR_CYAN, COLOR_GREEN};
+    const uint32_t colors[] = {COLOR_PURPLE, COLOR_BLUE, COLOR_CYAN,
+                               COLOR_GREEN};
     for (int i = 1; i <= 12; i++) {
         float t = (float) i / 12.f;
         float x = bx + t * bw;
@@ -1126,7 +1127,6 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
     } else if (tab_sel == 4) {
         /* Extras Tab - Tooltips, Badges, Banner, Data Table */
         static bool show_banner = true;
-        static int banner_action = 0;
 
         /* Tooltip demo */
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "TOOLTIPS");
@@ -1194,7 +1194,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
                 .action2 = "Dismiss",
                 .icon = "warning",
             };
-            banner_action = iui_banner(ui, &banner_opts);
+            int banner_action = iui_banner(ui, &banner_opts);
             if (banner_action == 1) {
                 printf("Banner: Retry clicked\n");
             } else if (banner_action == 2) {
@@ -1211,7 +1211,7 @@ static void draw_iui_components_window(iui_context *ui, float delta_time)
         /* Data Table demo */
         iui_text_label_small(ui, IUI_ALIGN_LEFT, "DATA TABLE");
         static iui_table_state table = {0}; /* user-provided state */
-        float col_widths[] = {-1.f, 80.f, 60.f};
+        const float col_widths[] = {-1.f, 80.f, 60.f};
         iui_table_begin(ui, &table, 3, col_widths);
 
         iui_table_header(ui, &table, "Name");
@@ -1773,7 +1773,7 @@ static void fe_draw_char_grid(iui_context *ui, fe_state_t *st)
                                   ui->renderer.user);
 
         /* Draw character label */
-        char label[2] = {(char) ch, '\0'};
+        const char label[2] = {(char) ch, '\0'};
         float tw = iui_text_width_vec(label, ui->font_height);
         float tx = cell.x + (cell_w - tw) * 0.5f;
         float ty = cell.y + (cell_h - ui->font_height) * 0.5f;
@@ -1861,7 +1861,7 @@ static void fe_handle_mouse(iui_context *ui, fe_state_t *st)
 }
 
 /* Handle keyboard input for point movement and undo */
-static void fe_handle_keys(iui_context *ui, fe_state_t *st)
+static void fe_handle_keys(const iui_context *ui, fe_state_t *st)
 {
     int key = ui->key_pressed;
     if (key == 0) {
@@ -2952,7 +2952,7 @@ static const char *dropdown_options[] = {"Option 1", "Option 2", "Option 3",
  * Clears all show_* flags except the one being activated.
  * Only used when control panel is active (requires MODULE_BASIC).
  */
-static void demo_close_other_windows(demo_state_t *state, bool *keep_open)
+static void demo_close_other_windows(demo_state_t *state, const bool *keep_open)
 {
 #ifdef CONFIG_DEMO_CALCULATOR
     if (&state->show_calculator != keep_open)
@@ -3232,14 +3232,14 @@ static void example_frame(void *arg)
 #ifdef CONFIG_MODULE_PICKER
     if (iui_tonal_button(ui, "Date Picker", IUI_ALIGN_CENTER)) {
         time_t now = time(NULL);
-        struct tm *t = localtime(&now);
+        const struct tm *t = localtime(&now);
         iui_date_picker_show(&state->date_picker, t->tm_year + 1900,
                              t->tm_mon + 1, t->tm_mday);
     }
     iui_grid_next(ui);
     if (iui_tonal_button(ui, "Time Picker", IUI_ALIGN_CENTER)) {
         time_t now = time(NULL);
-        struct tm *t = localtime(&now);
+        const struct tm *t = localtime(&now);
         iui_time_picker_show(&state->time_picker, t->tm_hour, t->tm_min, false);
     }
 #endif

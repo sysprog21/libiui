@@ -188,7 +188,7 @@ bool iui_nav_rail_item(iui_context *ctx,
     return false;
 }
 
-void iui_nav_rail_end(iui_context *ctx, iui_nav_rail_state *state)
+void iui_nav_rail_end(iui_context *ctx, const iui_nav_rail_state *state)
 {
     if (!ctx || !state)
         return;
@@ -258,8 +258,6 @@ bool iui_nav_bar_item(iui_context *ctx,
     /* Calculate vertical positions */
     float indicator_y = item_y + 12.f;
     float icon_cy = indicator_y + IUI_NAV_BAR_INDICATOR_HEIGHT * 0.5f;
-    float label_y =
-        item_y + 12.f + IUI_NAV_BAR_INDICATOR_HEIGHT + IUI_NAV_BAR_LABEL_GAP;
 
     /* Draw selection indicator */
     if (selected) {
@@ -295,6 +293,8 @@ bool iui_nav_bar_item(iui_context *ctx,
 
     /* Draw label */
     if (label) {
+        float label_y = item_y + 12.f + IUI_NAV_BAR_INDICATOR_HEIGHT +
+                        IUI_NAV_BAR_LABEL_GAP;
         float label_width = iui_get_text_width(ctx, label);
         float label_x = item_x + (item_width - label_width) * 0.5f;
         uint32_t label_color =
@@ -311,7 +311,7 @@ bool iui_nav_bar_item(iui_context *ctx,
     return false;
 }
 
-void iui_nav_bar_end(iui_context *ctx, iui_nav_bar_state *state)
+void iui_nav_bar_end(iui_context *ctx, const iui_nav_bar_state *state)
 {
     if (!ctx || !state)
         return;
@@ -480,14 +480,12 @@ void iui_nav_drawer_divider(iui_context *ctx)
     ctx->layout.y += 8.f;
     float x = ctx->layout.x + IUI_NAV_DRAWER_PADDING_H;
     float w = IUI_NAV_DRAWER_WIDTH - 2 * IUI_NAV_DRAWER_PADDING_H;
-    if (w > 0.f) {
-        ctx->renderer.draw_box((iui_rect_t) {x, ctx->layout.y, w, 1.f}, 0.f,
-                               ctx->colors.outline_variant, ctx->renderer.user);
-    }
+    ctx->renderer.draw_box((iui_rect_t) {x, ctx->layout.y, w, 1.f}, 0.f,
+                           ctx->colors.outline_variant, ctx->renderer.user);
     ctx->layout.y += 1.f + 8.f;
 }
 
-void iui_nav_drawer_end(iui_context *ctx, iui_nav_drawer_state *state)
+void iui_nav_drawer_end(iui_context *ctx, const iui_nav_drawer_state *state)
 {
     if (!ctx || !state)
         return;
@@ -565,7 +563,7 @@ bool iui_bottom_app_bar_action(iui_context *ctx,
 }
 
 bool iui_bottom_app_bar_fab(iui_context *ctx,
-                            iui_bottom_app_bar_state *state,
+                            const iui_bottom_app_bar_state *state,
                             const char *icon,
                             iui_fab_size_t size)
 {
@@ -618,7 +616,8 @@ bool iui_bottom_app_bar_fab(iui_context *ctx,
     return comp_state == IUI_STATE_PRESSED;
 }
 
-void iui_bottom_app_bar_end(iui_context *ctx, iui_bottom_app_bar_state *state)
+void iui_bottom_app_bar_end(iui_context *ctx,
+                            const iui_bottom_app_bar_state *state)
 {
     if (!ctx || !state)
         return;
@@ -721,7 +720,7 @@ bool iui_side_sheet_begin(iui_context *ctx,
     /* Draw sheet background (surface color, elevated slightly if standard) */
     iui_rect_t sheet_rect = {animated_x, 0, sheet_width, sheet_height};
     iui_elevation_t elevation =
-        state->modal ? IUI_ELEVATION_1 : IUI_ELEVATION_1;
+        state->modal ? IUI_ELEVATION_2 : IUI_ELEVATION_1;
 
     /* Draw left border for standard sheets (outline variant) */
     if (!state->modal) {

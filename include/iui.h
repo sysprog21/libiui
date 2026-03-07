@@ -913,8 +913,8 @@ void iui_segmented(iui_context *ctx,
  */
 void iui_slider(iui_context *ctx,
                 const char *label,
-                float min,
-                float max,
+                float min_value,
+                float max_value,
                 float step,
                 float *value,
                 const char *fmt);
@@ -2031,7 +2031,7 @@ void iui_table_row_end(iui_context *ctx, iui_table_state *state);
  * @ctx:   current UI context
  * @state: table state from iui_table_begin
  */
-void iui_table_end(iui_context *ctx, iui_table_state *state);
+void iui_table_end(iui_context *ctx, const iui_table_state *state);
 
 /* Scrollable Container
  * Creates a scrollable viewport using the existing clip stack.
@@ -2189,7 +2189,7 @@ bool iui_nav_rail_item(iui_context *ctx,
                        int index);
 
 /* End navigation rail rendering */
-void iui_nav_rail_end(iui_context *ctx, iui_nav_rail_state *state);
+void iui_nav_rail_end(iui_context *ctx, const iui_nav_rail_state *state);
 
 /* Toggle rail expanded/collapsed state */
 void iui_nav_rail_toggle(iui_nav_rail_state *state);
@@ -2227,7 +2227,7 @@ bool iui_nav_bar_item(iui_context *ctx,
                       int index);
 
 /* End navigation bar rendering */
-void iui_nav_bar_end(iui_context *ctx, iui_nav_bar_state *state);
+void iui_nav_bar_end(iui_context *ctx, const iui_nav_bar_state *state);
 
 /* Navigation Drawer Component
  * Side panel navigation for larger screens
@@ -2267,7 +2267,7 @@ bool iui_nav_drawer_item(iui_context *ctx,
 void iui_nav_drawer_divider(iui_context *ctx);
 
 /* End navigation drawer rendering */
-void iui_nav_drawer_end(iui_context *ctx, iui_nav_drawer_state *state);
+void iui_nav_drawer_end(iui_context *ctx, const iui_nav_drawer_state *state);
 
 /* Open/close drawer */
 void iui_nav_drawer_open(iui_nav_drawer_state *state);
@@ -2339,7 +2339,8 @@ bool iui_bottom_sheet_begin(iui_context *ctx,
                             float screen_height);
 
 /* End bottom sheet rendering */
-void iui_bottom_sheet_end(iui_context *ctx, iui_bottom_sheet_state *state);
+void iui_bottom_sheet_end(iui_context *ctx,
+                          const iui_bottom_sheet_state *state);
 
 /* Open/close bottom sheet */
 void iui_bottom_sheet_open(iui_bottom_sheet_state *state);
@@ -2387,12 +2388,13 @@ bool iui_bottom_app_bar_action(iui_context *ctx,
 
 /* Add FAB (right side). Returns true if clicked */
 bool iui_bottom_app_bar_fab(iui_context *ctx,
-                            iui_bottom_app_bar_state *state,
+                            const iui_bottom_app_bar_state *state,
                             const char *icon,
                             iui_fab_size_t size);
 
 /* End bottom app bar rendering */
-void iui_bottom_app_bar_end(iui_context *ctx, iui_bottom_app_bar_state *state);
+void iui_bottom_app_bar_end(iui_context *ctx,
+                            const iui_bottom_app_bar_state *state);
 
 /* Menu Component
  * Vertical dropdown menu with support for icons, shortcuts, dividers, and

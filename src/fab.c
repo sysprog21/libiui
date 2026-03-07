@@ -77,9 +77,9 @@ static bool iui_fab_internal(iui_context *ctx,
         iui_internal_draw_text(ctx, content_x, label_y, label, content_color);
     } else {
         /* Standard FAB: centered icon only */
-        float icon_cx = x + fab_w * 0.5f;
-        float icon_cy = center_y;
         if (icon) {
+            float icon_cx = x + fab_w * 0.5f;
+            float icon_cy = center_y;
             iui_draw_fab_icon(ctx, icon_cx, icon_cy, icon_size, icon,
                               content_color);
         }

@@ -655,7 +655,7 @@ bool iui_bottom_sheet_begin(iui_context *ctx,
     return true;
 }
 
-void iui_bottom_sheet_end(iui_context *ctx, iui_bottom_sheet_state *state)
+void iui_bottom_sheet_end(iui_context *ctx, const iui_bottom_sheet_state *state)
 {
     if (!ctx || !state)
         return;
@@ -1186,7 +1186,7 @@ void iui_table_row_end(iui_context *ctx, iui_table_state *state)
         0.f, ctx->colors.outline_variant, ctx->renderer.user);
 }
 
-void iui_table_end(iui_context *ctx, iui_table_state *state)
+void iui_table_end(iui_context *ctx, const iui_table_state *state)
 {
     if (!ctx || !ctx->current_window || !state)
         return;

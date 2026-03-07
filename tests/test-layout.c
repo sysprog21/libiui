@@ -88,7 +88,7 @@ static void test_window_autosize_expands_to_content(void)
 
     /* After frame 1: min_width should be updated to fit content */
     /* content (450) + padding*4 (32) = 482, but also consider title min */
-    iui_window *w = &ctx->windows[0];
+    const iui_window *w = &ctx->windows[0];
     ASSERT_TRUE(w->min_width >= 450.0f); /* Should accommodate content */
 
     /* Frame 2: Window should auto-expand */
@@ -121,7 +121,7 @@ static void test_window_autosize_only_grows(void)
     iui_end_window(ctx);
     iui_end_frame(ctx);
 
-    iui_window *w = &ctx->windows[0];
+    const iui_window *w = &ctx->windows[0];
     float width_after_frame1 = w->width;
 
     /* Frame 2: Window should NOT shrink */
@@ -155,7 +155,7 @@ static void test_window_no_autosize_ignores_content_width(void)
     iui_end_window(ctx);
     iui_end_frame(ctx);
 
-    iui_window *w = &ctx->windows[0];
+    const iui_window *w = &ctx->windows[0];
 
     /* Frame 2: Width should NOT expand (no auto-size) */
     iui_begin_frame(ctx, 1.0f / 60.0f);

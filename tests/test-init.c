@@ -43,7 +43,7 @@ static void test_init_zero_font_height(void)
             },
     };
     ASSERT_FALSE(iui_config_is_valid(&config));
-    iui_context *ctx = iui_init(&config);
+    const iui_context *ctx = iui_init(&config);
     ASSERT_NULL(ctx);
     free(buffer);
     PASS();
@@ -65,7 +65,7 @@ static void test_init_negative_font_height(void)
             },
     };
     ASSERT_FALSE(iui_config_is_valid(&config));
-    iui_context *ctx = iui_init(&config);
+    const iui_context *ctx = iui_init(&config);
     ASSERT_NULL(ctx);
     free(buffer);
     PASS();
@@ -87,7 +87,7 @@ static void test_init_missing_draw_box(void)
             },
     };
     ASSERT_FALSE(iui_config_is_valid(&config));
-    iui_context *ctx = iui_init(&config);
+    const iui_context *ctx = iui_init(&config);
     ASSERT_NULL(ctx);
     free(buffer);
     PASS();
@@ -109,7 +109,7 @@ static void test_init_missing_set_clip(void)
             },
     };
     ASSERT_FALSE(iui_config_is_valid(&config));
-    iui_context *ctx = iui_init(&config);
+    const iui_context *ctx = iui_init(&config);
     ASSERT_NULL(ctx);
     free(buffer);
     PASS();

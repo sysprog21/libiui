@@ -60,6 +60,43 @@ jobs:
       - name: Check code formatting
         run: .ci/check-format.sh
 
+  static-analysis:
+    needs: [detect-code-related-file-changes]
+    if: needs.detect-code-related-file-changes.outputs.has_code_related_changes == 'true'
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: .ci/install-deps.sh analysis
+      - name: scan-build
+        run: |
+          make defconfig
+          make clean
+          scan-build-20 --status-bugs \
+            -o /tmp/scan-build-report \
+            make -j$(nproc)
+      - name: Upload scan-build report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scan-build-report
+          path: /tmp/scan-build-report
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: scan-build (alpha checkers, informational)
+        if: always()
+        continue-on-error: true
+        run: |
+          make clean
+          scan-build-20 \
+            -enable-checker alpha.deadcode.UnreachableCode \
+            -enable-checker alpha.unix.cstring.OutOfBounds \
+            -o /tmp/scan-build-alpha-report \
+            make -j$(nproc) 2>&1 | tee /tmp/alpha-output.txt
+          WARNINGS=$(grep -c "warning:" /tmp/alpha-output.txt || true)
+          echo "::notice::Alpha checkers found $WARNINGS warnings (informational only)"
+
   unit-tests:
     needs: [detect-code-related-file-changes]
     if: needs.detect-code-related-file-changes.outputs.has_code_related_changes == 'true'

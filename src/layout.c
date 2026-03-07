@@ -810,10 +810,11 @@ void iui_end_window(iui_context *ctx)
     /* Assert balanced clips and no abandoned scroll regions.
      * Clear current_window BEFORE iui_pop_clip so the floor guard
      * (depth >= 1 while inside a window) allows this final pop. */
-    assert(!ctx->active_scroll &&
-           "abandoned scroll region: iui_scroll_end not called inside window");
-    assert(ctx->clip.depth == 1 &&
-           "unbalanced iui_push_clip/iui_pop_clip inside window");
+    IUI_ASSERT(
+        !ctx->active_scroll &&
+        "abandoned scroll region: iui_scroll_end not called inside window");
+    IUI_ASSERT(ctx->clip.depth == 1 &&
+               "unbalanced iui_push_clip/iui_pop_clip inside window");
     ctx->clip.depth = 1;        /* safety: discard any leaked clips */
     ctx->current_window = NULL; /* must precede pop for floor guard bypass */
     iui_pop_clip(ctx);
@@ -855,7 +856,8 @@ void iui_end_frame(iui_context *ctx)
     ctx->active_scroll = NULL;
 
     /* Each begin_window/end_window pair must balance its clip push/pop. */
-    assert(ctx->clip.depth == 0 && "leaked clip region across frame boundary");
+    IUI_ASSERT(ctx->clip.depth == 0 &&
+               "leaked clip region across frame boundary");
     if (ctx->clip.depth != 0) {
         /* Release recovery: reset both logical and renderer clip state so the
          * next frame starts clean rather than with stale clipping applied. */

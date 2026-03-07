@@ -827,7 +827,7 @@ static void test_wcag_contrast_functions(void)
 static void test_a11y_callbacks_disabled_by_default(void)
 {
     TEST(a11y_callbacks_disabled_by_default);
-    iui_context *ctx = test_init_context();
+    const iui_context *ctx = test_init_context();
     ASSERT_NOT_NULL(ctx);
     /* Accessibility should be disabled by default */
     ASSERT_FALSE(iui_a11y_enabled(ctx));

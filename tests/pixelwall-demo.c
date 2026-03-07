@@ -177,7 +177,7 @@ static bool snake_safe(const pw_grid_t *g, pw_pos_t p)
            !snake_is_worm(g, p);
 }
 
-static void snake_ai(pw_grid_t *g, SnakeState *st)
+static void snake_ai(const pw_grid_t *g, SnakeState *st)
 {
     pw_pos_t head = st->worm.body[0].position;
     pw_pos_t fp = st->fruit_pos;
@@ -464,7 +464,11 @@ static bool tetris_piece_cell(int type, int rot, int r, int c)
     return (bits >> (15 - idx)) & 1;
 }
 
-static bool tetris_collides(TetrisData *td, int type, int rot, int px, int py)
+static bool tetris_collides(const TetrisData *td,
+                            int type,
+                            int rot,
+                            int px,
+                            int py)
 {
     for (int r = 0; r < 4; r++) {
         for (int c = 0; c < 4; c++) {
@@ -481,7 +485,7 @@ static bool tetris_collides(TetrisData *td, int type, int rot, int px, int py)
     return false;
 }
 
-static int tetris_field_height(TetrisData *td)
+static int tetris_field_height(const TetrisData *td)
 {
     int h = 0;
     for (int c = 0; c < FIELD_W; c++) {
@@ -497,7 +501,7 @@ static int tetris_field_height(TetrisData *td)
     return h;
 }
 
-static int tetris_count_holes(TetrisData *td)
+static int tetris_count_holes(const TetrisData *td)
 {
     int holes = 0;
     for (int c = 0; c < FIELD_W; c++) {
@@ -512,7 +516,7 @@ static int tetris_count_holes(TetrisData *td)
     return holes;
 }
 
-static int tetris_count_complete(TetrisData *td)
+static int tetris_count_complete(const TetrisData *td)
 {
     int n = 0;
     for (int r = 0; r < FIELD_H; r++) {
@@ -751,7 +755,7 @@ static int invaders_enemy_grid_col(int c)
     return c * INV_ENEMY_SPACING;
 }
 
-static int invaders_nearest_col(InvadersData *id)
+static int invaders_nearest_col(const InvadersData *id)
 {
     int best = -1, best_dist = 100;
     for (int c = 0; c < INV_ENEMY_COLS; c++) {
@@ -1054,8 +1058,8 @@ static void pacman_march_update(pw_grid_t *g, void *data)
     pd->tick++;
     if (pd->tick >= PM_SPEED) {
         pd->tick = 0;
-        int total = 2 * PM_SPACING + PM_SPRITE_W;
         if (pd->phase == 0) {
+            int total = 2 * PM_SPACING + PM_SPRITE_W;
             pd->x--;
             if (pd->x + total < 0)
                 pm_start_phase(pd, 1);

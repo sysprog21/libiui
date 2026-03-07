@@ -83,7 +83,7 @@ void iui_headless_inject_text(iui_port_ctx *ctx, uint32_t codepoint);
 const uint32_t *iui_headless_get_framebuffer(iui_port_ctx *ctx);
 
 /* Get framebuffer dimensions */
-void iui_headless_get_framebuffer_size(iui_port_ctx *ctx,
+void iui_headless_get_framebuffer_size(const iui_port_ctx *ctx,
                                        int *width,
                                        int *height);
 

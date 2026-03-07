@@ -1515,7 +1515,7 @@ void iui_pop_layer(iui_context *ctx)
         ctx->input_layer.current_z_order = 0;
     } else {
         /* Restore to previous stack entry */
-        iui_layer_entry_t *prev =
+        const iui_layer_entry_t *prev =
             &ctx->input_layer.layer_stack[ctx->input_layer.layer_depth - 1];
         ctx->input_layer.current_layer_id = prev->layer_id;
         ctx->input_layer.current_z_order = prev->z_order;
@@ -1665,7 +1665,7 @@ void iui_register_textfield(iui_context *ctx, void *buffer)
 
     /* Probe entire table until finding empty slot or duplicate */
     for (int probe = 0; probe < IUI_MAX_TRACKED_TEXTFIELDS; probe++) {
-        void *cached = ctx->field_tracking.textfield_ids[idx];
+        const void *cached = ctx->field_tracking.textfield_ids[idx];
         if (!cached) {
             /* Found empty slot, insert here */
             ctx->field_tracking.textfield_ids[idx] = buffer;
@@ -1715,7 +1715,7 @@ bool iui_textfield_is_registered(const iui_context *ctx, const void *buffer)
 
     /* Probe entire table looking for match or empty slot */
     for (int probe = 0; probe < IUI_MAX_TRACKED_TEXTFIELDS; probe++) {
-        void *cached = ctx->field_tracking.textfield_ids[idx];
+        const void *cached = ctx->field_tracking.textfield_ids[idx];
         if (cached == buffer)
             return true;
         if (!cached)
@@ -1725,7 +1725,7 @@ bool iui_textfield_is_registered(const iui_context *ctx, const void *buffer)
     return false;
 }
 
-bool iui_slider_is_registered(const iui_context *ctx, uint32_t slider_id)
+static bool iui_slider_is_registered(const iui_context *ctx, uint32_t slider_id)
 {
     if (slider_id == 0)
         return false;

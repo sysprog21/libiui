@@ -292,7 +292,7 @@ static void test_slider_click_to_value(void)
     ASSERT_NOT_NULL(ctx);
 
     /* Test that slider renders correctly at different values */
-    float test_values[] = {0.f, 25.f, 50.f, 75.f, 100.f};
+    const float test_values[] = {0.f, 25.f, 50.f, 75.f, 100.f};
     for (int i = 0; i < 5; i++) {
         iui_begin_frame(ctx, 1.0f / 60.0f);
         iui_begin_window(ctx, "Test", 0, 0, 400, 300, 0);

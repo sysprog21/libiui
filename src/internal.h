@@ -11,10 +11,23 @@
 #ifndef IUI_INTERNAL_H
 #define IUI_INTERNAL_H
 
+#include <assert.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+/* Assert macro that is invisible to the Clang Static Analyzer.
+ * Preserves debug-mode abort and release-mode recovery (defense-in-depth)
+ * without triggering alpha.deadcode.UnreachableCode false positives.
+ */
+#ifdef __clang_analyzer__
+#define IUI_ASSERT(cond) \
+    do {                 \
+    } while (0)
+#else
+#define IUI_ASSERT(cond) assert(cond)
+#endif
 
 #include "font.h"
 #include "iui.h"
@@ -1212,7 +1225,7 @@ void iui_field_tracking_frame_end(iui_context *ctx);
 bool iui_textfield_is_registered(const iui_context *ctx, const void *buffer);
 
 /* Check if a slider was registered this frame */
-bool iui_slider_is_registered(const iui_context *ctx, uint32_t slider_id);
+/* iui_slider_is_registered is static in core.c */
 
 /* MD3 Runtime Validation (Debug Builds)
  * These macros validate that rendered components conform to MD3 specifications.

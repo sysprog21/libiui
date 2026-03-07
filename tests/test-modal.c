@@ -769,7 +769,7 @@ static void test_input_layer_initial_state(void)
 {
     TEST(input_layer_initial_state);
     void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
+    const iui_context *ctx = create_test_context(buffer, false);
     ASSERT_TRUE(ctx != NULL);
 
     /* Initial state: no active layers */

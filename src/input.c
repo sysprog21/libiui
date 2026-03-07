@@ -459,11 +459,11 @@ static void textfield_move_left(const char *buffer,
             state->cursor = prev;
         }
         while (state->cursor > 0) {
-            size_t prev = iui_utf8_prev(buffer, state->cursor);
-            uint32_t cp = iui_utf8_decode(buffer, prev, len);
+            size_t prev2 = iui_utf8_prev(buffer, state->cursor);
+            uint32_t cp = iui_utf8_decode(buffer, prev2, len);
             if (!iui_utf8_is_word_char(cp))
                 break;
-            state->cursor = prev;
+            state->cursor = prev2;
         }
     } else {
         state->cursor = iui_utf8_prev(buffer, state->cursor);

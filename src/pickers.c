@@ -471,7 +471,6 @@ bool iui_time_picker(iui_context *ctx,
 
     /* Add space for AM/PM toggle if using 12H format */
     float ampm_width = 0.f;
-    float ampm_total_height = IUI_TIME_PICKER_AMPM_HEIGHT; /* 96dp total */
     if (!picker->use_24h) {
         ampm_width = IUI_TIME_PICKER_AMPM_WIDTH; /* 52dp */
         dialog_w += ampm_width + padding;
@@ -584,6 +583,7 @@ bool iui_time_picker(iui_context *ctx,
 
     /* AM/PM toggle (12H only) */
     if (!picker->use_24h) {
+        float ampm_total_height = IUI_TIME_PICKER_AMPM_HEIGHT; /* 96dp total */
         float ampm_x = dialog_x + dialog_w - padding - ampm_width;
         /* MD3: total height 96dp with 12dp gap = 42dp per button */
         float ampm_gap = 12.f; /* material_clock_period_toggle_vertical_gap */

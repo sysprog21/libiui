@@ -113,12 +113,10 @@ void iui_segmented(iui_context *ctx,
         uint32_t text_color = is_selected ? ctx->colors.on_secondary_container
                                           : ctx->colors.on_surface;
 
-        /* Draw checkmark icon on selected segment */
-        float icon_size = IUI_SEGMENTED_ICON_SIZE,
-              text_w = iui_get_text_width(ctx, entries[i]);
-
         if (is_selected) {
             /* Calculate total content width: checkmark + gap + text */
+            float icon_size = IUI_SEGMENTED_ICON_SIZE,
+                  text_w = iui_get_text_width(ctx, entries[i]);
             float gap = 8.f, content_width = icon_size + gap + text_w,
                   content_x = seg_x + (seg_width - content_width) / 2.f,
                   icon_cx = content_x + icon_size / 2.f,

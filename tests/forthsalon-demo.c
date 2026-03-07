@@ -202,9 +202,6 @@ typedef struct {
     int jump_stack[32];
     int jump_top;
 
-    /* Temp word body being compiled */
-    fs_inst_t word_body[FS_MAX_CODE / 4];
-    int word_body_len;
     int defining_word; /* -1 = compiling to main, >=0 = compiling word index */
 } fs_compiler_t;
 
@@ -399,7 +396,7 @@ static bool fs_handle_token(fs_compiler_t *c, const char *token)
     return false; /* unknown word */
 }
 
-bool fs_compile(fs_program_t *prog, const char *source)
+static bool fs_compile(fs_program_t *prog, const char *source)
 {
     fs_compiler_t compiler;
     fs_compiler_init(&compiler, prog);

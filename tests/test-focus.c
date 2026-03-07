@@ -13,7 +13,7 @@ static void test_focus_initial_state(void)
 {
     TEST(focus_initial_state);
     void *buffer = malloc(iui_min_memory_size());
-    iui_context *ctx = create_test_context(buffer, false);
+    const iui_context *ctx = create_test_context(buffer, false);
     ASSERT_NOT_NULL(ctx);
 
     /* Initially no widget should have focus */

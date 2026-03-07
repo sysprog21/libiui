@@ -116,7 +116,7 @@ static void test_slider_stale_state_cleared(void)
     iui_update_mouse_pos(ctx, 220.0f, 150.0f);
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 100, 100, 300, 200, 0);
-    value = iui_slider_ex(ctx, value, 0.0f, 100.0f, 1.0f, NULL);
+    (void) iui_slider_ex(ctx, value, 0.0f, 100.0f, 1.0f, NULL);
     iui_end_window(ctx);
     iui_end_frame(ctx);
 
@@ -646,7 +646,7 @@ static void test_slider_unrendered_clears_active(void)
     iui_update_mouse_pos(ctx, 220.0f, 150.0f);
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 100, 100, 300, 200, 0);
-    value = iui_slider_ex(ctx, value, 0.0f, 100.0f, 1.0f, NULL);
+    (void) iui_slider_ex(ctx, value, 0.0f, 100.0f, 1.0f, NULL);
     iui_end_window(ctx);
     iui_end_frame(ctx);
 

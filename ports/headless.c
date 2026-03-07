@@ -710,7 +710,7 @@ const uint32_t *iui_headless_get_framebuffer(iui_port_ctx *ctx)
 /*
  * Get framebuffer dimensions.
  */
-void iui_headless_get_framebuffer_size(iui_port_ctx *ctx,
+void iui_headless_get_framebuffer_size(const iui_port_ctx *ctx,
                                        int *width,
                                        int *height)
 {
@@ -1165,7 +1165,7 @@ void iui_headless_process_shm_events(iui_port_ctx *ctx)
     /* Process all pending events */
     while (hdr->event_read_idx != hdr->event_write_idx) {
         uint32_t idx = hdr->event_read_idx % IUI_SHM_EVENT_RING_SIZE;
-        iui_shm_event_t *ev = &events[idx];
+        const iui_shm_event_t *ev = &events[idx];
 
         switch (ev->type) {
         case IUI_SHM_EVENT_MOUSE_MOVE:
