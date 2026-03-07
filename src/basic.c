@@ -349,7 +349,11 @@ float iui_slider_ex(iui_context *ctx,
         clamp_float(track_rect.x, track_rect.x + track_rect.width, thumb_x);
 
     /* Calculate value from thumb position */
-    norm_value = (thumb_x - track_rect.x) / track_rect.width;
+    if (track_rect.width > 0.f) {
+        norm_value = (thumb_x - track_rect.x) / track_rect.width;
+    } else {
+        norm_value = 0.f;
+    }
     value = norm_value * (max - min) + min;
     if (step > 0.f)
         value = roundf(value / step) * step;
@@ -441,6 +445,251 @@ float iui_slider_ex(iui_context *ctx,
     iui_newline(ctx);
 
     return value;
+}
+
+/* Range Slider - two-thumb variant for selecting a value range */
+
+bool iui_range_slider(iui_context *ctx,
+                      iui_range_slider_state *state,
+                      float min,
+                      float max,
+                      float step,
+                      const iui_slider_options *options)
+{
+    if (!ctx->current_window || !state || max <= min)
+        return false;
+
+    /* Clamp inputs and enforce low <= high */
+    float low = clamp_float(min, max, state->value_low);
+    float high = clamp_float(min, max, state->value_high);
+    if (low > high) {
+        float tmp = low;
+        low = high;
+        high = tmp;
+    }
+    float orig_low = low, orig_high = high;
+
+    bool disabled = options && options->disabled;
+
+    /* Get colors */
+    uint32_t active_color = (options && options->active_track_color)
+                                ? options->active_track_color
+                                : ctx->colors.primary;
+    uint32_t inactive_color = (options && options->inactive_track_color)
+                                  ? options->inactive_track_color
+                                  : ctx->colors.surface_container_highest;
+    uint32_t handle_color = (options && options->handle_color)
+                                ? options->handle_color
+                                : ctx->colors.primary;
+
+    if (disabled) {
+        active_color =
+            iui_state_layer(ctx->colors.on_surface, IUI_STATE_FOCUS_ALPHA);
+        inactive_color =
+            iui_state_layer(ctx->colors.on_surface, IUI_STATE_FOCUS_ALPHA);
+        handle_color =
+            iui_state_layer(ctx->colors.on_surface, IUI_STATE_DISABLE_ALPHA);
+    }
+
+    /* Draw labels */
+    if (options && options->start_text) {
+        uint32_t lc = disabled ? iui_state_layer(ctx->colors.on_surface,
+                                                 IUI_STATE_DISABLE_ALPHA)
+                               : ctx->colors.on_surface;
+        draw_align_text(ctx, &ctx->layout, options->start_text, lc,
+                        IUI_ALIGN_LEFT);
+    }
+    if (options && options->end_text) {
+        uint32_t lc = disabled ? iui_state_layer(ctx->colors.on_surface,
+                                                 IUI_STATE_DISABLE_ALPHA)
+                               : ctx->colors.on_surface;
+        draw_align_text(ctx, &ctx->layout, options->end_text, lc,
+                        IUI_ALIGN_RIGHT);
+    }
+    if (options && (options->start_text || options->end_text))
+        iui_newline(ctx);
+
+    float center_y = ctx->layout.y + 0.5f * ctx->layout.height;
+    float track_height = IUI_SLIDER_TRACK_HEIGHT;
+    float track_margin = ctx->layout.width * 0.05f;
+    iui_rect_t track_rect = {
+        .x = ctx->layout.x + track_margin,
+        .y = center_y - track_height * 0.5f,
+        .width = ctx->layout.width - track_margin * 2.f,
+        .height = track_height,
+    };
+
+    float range = max - min;
+    float norm_low = (low - min) / range;
+    float norm_high = (high - min) / range;
+    float thumb_low_x = norm_low * track_rect.width + track_rect.x;
+    float thumb_high_x = norm_high * track_rect.width + track_rect.x;
+
+    /* Generate unique IDs for the two thumbs */
+    uint32_t base_id = iui_hash("range_slider", 12) ^
+                       iui_hash_pos(ctx->layout.x, ctx->layout.y);
+    uint32_t id_low = iui_slider_masked_id(base_id);
+    uint32_t id_high = iui_slider_masked_id(base_id ^ 0x12345678u);
+
+    iui_register_slider(ctx, id_low);
+    iui_register_slider(ctx, id_high);
+
+    /* Determine which thumb is being dragged */
+    bool dragging_low =
+        ((ctx->slider.active_id & IUI_SLIDER_ID_MASK) == id_low) &&
+        !(ctx->slider.active_id & IUI_SLIDER_ANIM_FLAG);
+    bool dragging_high =
+        ((ctx->slider.active_id & IUI_SLIDER_ID_MASK) == id_high) &&
+        !(ctx->slider.active_id & IUI_SLIDER_ANIM_FLAG);
+
+    float thumb_size = IUI_SLIDER_THUMB_IDLE;
+    float half = thumb_size * 0.5f;
+    float pressed_half = IUI_SLIDER_THUMB_PRESSED * 0.5f;
+
+    /* Touch rects for both thumbs */
+    iui_rect_t touch_low = {thumb_low_x - half, center_y - half, thumb_size,
+                            thumb_size};
+    iui_rect_t touch_high = {thumb_high_x - half, center_y - half, thumb_size,
+                             thumb_size};
+    iui_expand_touch_target(&touch_low, IUI_SLIDER_TOUCH_TARGET);
+    iui_expand_touch_target(&touch_high, IUI_SLIDER_TOUCH_TARGET);
+
+    iui_state_t state_low = iui_get_component_state(ctx, touch_low, disabled);
+    iui_state_t state_high = iui_get_component_state(ctx, touch_high, disabled);
+
+    if (!disabled) {
+        /* Start drag on press - pick closer thumb when both are pressed */
+        bool low_pressed =
+            (state_low == IUI_STATE_PRESSED) && !dragging_low && !dragging_high;
+        bool high_pressed = (state_high == IUI_STATE_PRESSED) &&
+                            !dragging_low && !dragging_high;
+
+        if (low_pressed && high_pressed) {
+            /* Both pressed (overlapping targets): pick closer thumb */
+            float dist_low = fabsf(ctx->mouse_pos.x - thumb_low_x);
+            float dist_high = fabsf(ctx->mouse_pos.x - thumb_high_x);
+            if (dist_high < dist_low)
+                low_pressed = false;
+            else
+                high_pressed = false;
+        }
+
+        if (low_pressed) {
+            ctx->slider.active_id = id_low;
+            ctx->slider.drag_offset = ctx->mouse_pos.x - thumb_low_x;
+            dragging_low = true;
+        } else if (high_pressed) {
+            ctx->slider.active_id = id_high;
+            ctx->slider.drag_offset = ctx->mouse_pos.x - thumb_high_x;
+            dragging_high = true;
+        }
+
+        /* Update drag */
+        if (dragging_low && (ctx->mouse_held & IUI_MOUSE_LEFT)) {
+            thumb_low_x = ctx->mouse_pos.x - ctx->slider.drag_offset;
+            thumb_low_x = clamp_float(track_rect.x, thumb_high_x, thumb_low_x);
+        } else if (dragging_low) {
+            ctx->slider.active_id = 0;
+            dragging_low = false;
+        }
+
+        if (dragging_high && (ctx->mouse_held & IUI_MOUSE_LEFT)) {
+            thumb_high_x = ctx->mouse_pos.x - ctx->slider.drag_offset;
+            thumb_high_x = clamp_float(
+                thumb_low_x, track_rect.x + track_rect.width, thumb_high_x);
+        } else if (dragging_high) {
+            ctx->slider.active_id = 0;
+            dragging_high = false;
+        }
+    }
+
+    /* Calculate values from thumb positions */
+    if (track_rect.width > 0.f) {
+        norm_low = (thumb_low_x - track_rect.x) / track_rect.width;
+        norm_high = (thumb_high_x - track_rect.x) / track_rect.width;
+    } else {
+        norm_low = 0.f;
+        norm_high = 0.f;
+    }
+    low = norm_low * range + min;
+    high = norm_high * range + min;
+
+    if (step > 0.f) {
+        low = roundf(low / step) * step;
+        high = roundf(high / step) * step;
+    }
+    low = clamp_float(min, max, low);
+    high = clamp_float(min, max, high);
+
+    /* Resolve crossing after quantization: clamp the non-dragged thumb */
+    if (low > high) {
+        if (dragging_high)
+            high = low;
+        else
+            low = high;
+    }
+
+    /* Recalculate thumb positions after quantization */
+    norm_low = (low - min) / range;
+    norm_high = (high - min) / range;
+    thumb_low_x = norm_low * track_rect.width + track_rect.x;
+    thumb_high_x = norm_high * track_rect.width + track_rect.x;
+
+    /* Draw inactive track (full width) */
+    ctx->renderer.draw_box(track_rect, track_height * 0.5f, inactive_color,
+                           ctx->renderer.user);
+
+    /* Draw active track (between thumbs) */
+    float active_x = thumb_low_x;
+    float active_w = thumb_high_x - thumb_low_x;
+    if (active_w > 0.f) {
+        ctx->renderer.draw_box(
+            (iui_rect_t) {active_x, track_rect.y, active_w, track_height},
+            track_height * 0.5f, active_color, ctx->renderer.user);
+    }
+
+    /* State layers on hover/drag */
+    for (int i = 0; i < 2; i++) {
+        float tx = (i == 0) ? thumb_low_x : thumb_high_x;
+        bool hovered = (i == 0) ? (state_low == IUI_STATE_HOVERED)
+                                : (state_high == IUI_STATE_HOVERED);
+        bool dragging = (i == 0) ? dragging_low : dragging_high;
+
+        if ((hovered || dragging) && !disabled) {
+            float ss = thumb_size * 1.5f;
+            uint8_t alpha =
+                dragging ? IUI_STATE_DRAG_ALPHA : IUI_STATE_HOVER_ALPHA;
+            uint32_t sc = iui_state_layer(handle_color, alpha);
+            ctx->renderer.draw_box(
+                (iui_rect_t) {tx - ss * 0.5f, center_y - ss * 0.5f, ss, ss},
+                ss * 0.5f, sc, ctx->renderer.user);
+        }
+    }
+
+    /* Draw both thumbs */
+    float draw_half_low = dragging_low ? pressed_half : half;
+    float draw_half_high = dragging_high ? pressed_half : half;
+    float draw_size_low = draw_half_low * 2.f;
+    float draw_size_high = draw_half_high * 2.f;
+
+    ctx->renderer.draw_box(
+        (iui_rect_t) {thumb_low_x - draw_half_low, center_y - draw_half_low,
+                      draw_size_low, draw_size_low},
+        draw_half_low, handle_color, ctx->renderer.user);
+    ctx->renderer.draw_box(
+        (iui_rect_t) {thumb_high_x - draw_half_high, center_y - draw_half_high,
+                      draw_size_high, draw_size_high},
+        draw_half_high, handle_color, ctx->renderer.user);
+
+    /* MD3 validation */
+    IUI_MD3_TRACK_SLIDER(touch_low, touch_low.height * 0.5f);
+
+    iui_newline(ctx);
+
+    state->value_low = low;
+    state->value_high = high;
+
+    return (low != orig_low) || (high != orig_high);
 }
 
 /* Buttons */

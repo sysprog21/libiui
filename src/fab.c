@@ -40,8 +40,12 @@ static bool iui_fab_internal(iui_context *ctx,
 
     iui_rect_t fab_rect = {x, y, fab_w, fab_h};
 
+    /* Expand touch target to meet 48dp minimum for accessibility */
+    iui_rect_t touch_rect = fab_rect;
+    iui_expand_touch_target(&touch_rect, IUI_ICON_BUTTON_TOUCH_TARGET);
+
     /* Get component state for interaction */
-    iui_state_t state = iui_get_component_state(ctx, fab_rect, false);
+    iui_state_t state = iui_get_component_state(ctx, touch_rect, false);
 
     /* MD3 FAB colors */
     uint32_t container_color = ctx->colors.primary_container;
@@ -100,6 +104,14 @@ static bool iui_fab_internal(iui_context *ctx,
         return true;
 
     return false;
+}
+
+/* Small FAB (40dp) */
+bool iui_fab_small(iui_context *ctx, float x, float y, const char *icon)
+{
+    return iui_fab_internal(ctx, x, y, IUI_FAB_SMALL_SIZE,
+                            IUI_FAB_SMALL_CORNER_RADIUS,
+                            IUI_FAB_SMALL_ICON_SIZE, icon, NULL);
 }
 
 /* Standard FAB (56dp) */

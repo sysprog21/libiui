@@ -91,6 +91,15 @@
 /* FAB (Floating Action Button) -
  * https://m3.material.io/components/floating-action-button/specs
  */
+#ifndef IUI_FAB_SMALL_SIZE
+#define IUI_FAB_SMALL_SIZE 40.f
+#endif
+#ifndef IUI_FAB_SMALL_CORNER_RADIUS
+#define IUI_FAB_SMALL_CORNER_RADIUS 12.f
+#endif
+#ifndef IUI_FAB_SMALL_ICON_SIZE
+#define IUI_FAB_SMALL_ICON_SIZE 24.f
+#endif
 #ifndef IUI_FAB_SIZE
 #define IUI_FAB_SIZE 56.f
 #endif

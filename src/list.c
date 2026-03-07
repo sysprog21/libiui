@@ -400,6 +400,22 @@ bool iui_list_item_two_line(iui_context *ctx,
     return iui_list_item_ex(ctx, IUI_LIST_TWO_LINE, &item);
 }
 
+bool iui_list_item_three_line(iui_context *ctx,
+                              const char *overline,
+                              const char *headline,
+                              const char *supporting,
+                              const char *icon)
+{
+    iui_list_item item = {
+        .overline = overline,
+        .headline = headline,
+        .supporting = supporting,
+        .leading_type = icon ? IUI_LIST_LEADING_ICON : IUI_LIST_LEADING_NONE,
+        .leading_icon = icon,
+    };
+    return iui_list_item_ex(ctx, IUI_LIST_THREE_LINE, &item);
+}
+
 void iui_list_divider(iui_context *ctx)
 {
     if (!ctx || !ctx->current_window)

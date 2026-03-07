@@ -141,6 +141,14 @@ typedef struct {
     bool disabled;                 /* grayed out, no interaction */
 } iui_slider_options;
 
+/* MD3 Range Slider state for two-thumb interaction
+ * Reference: https://m3.material.io/components/sliders/specs
+ */
+typedef struct {
+    float value_low;  /* current low-end value (updated by widget) */
+    float value_high; /* current high-end value (updated by widget) */
+} iui_range_slider_state;
+
 /* MD3 Card styles */
 typedef enum iui_card_style {
     IUI_CARD_ELEVATED, /* shadow effect */
@@ -938,6 +946,22 @@ float iui_slider_ex(iui_context *ctx,
                     float step,
                     const iui_slider_options *options);
 
+/* Range slider with two thumbs for selecting a value range
+ * @state: range slider state (value_low/value_high updated by widget)
+ * @min:   minimum allowed value
+ * @max:   maximum allowed value
+ * @step:  quantization step (0 = continuous)
+ * @options: optional slider appearance/behavior (NULL for defaults)
+ *
+ * Returns true if either value changed this frame
+ */
+bool iui_range_slider(iui_context *ctx,
+                      iui_range_slider_state *state,
+                      float min,
+                      float max,
+                      float step,
+                      const iui_slider_options *options);
+
 /* Displays a clickable button
  * @ctx:       current UI context
  * @label:     button label text
@@ -1497,6 +1521,11 @@ typedef enum iui_fab_size {
     IUI_FAB_SMALL,    /* 40dp (for compact spaces) */
     IUI_FAB_LARGE     /* 96dp */
 } iui_fab_size_t;
+
+/* Small FAB (40dp)
+ * Returns true if clicked this frame
+ */
+bool iui_fab_small(iui_context *ctx, float x, float y, const char *icon);
 
 /* Standard FAB (56dp)
  * Returns true if clicked this frame
@@ -2135,6 +2164,20 @@ bool iui_list_item_two_line(iui_context *ctx,
                             const char *headline,
                             const char *supporting,
                             const char *icon);
+
+/* Three-line list item (88dp) with overline, headline, and supporting text
+ * @overline:   category/overline text above headline
+ * @headline:   primary text
+ * @supporting: secondary text below headline
+ * @icon:       optional leading icon name (NULL = no icon)
+ *
+ * Returns true if item was clicked
+ */
+bool iui_list_item_three_line(iui_context *ctx,
+                              const char *overline,
+                              const char *headline,
+                              const char *supporting,
+                              const char *icon);
 
 /* List divider (inset by 16dp from left) */
 void iui_list_divider(iui_context *ctx);

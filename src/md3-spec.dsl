@@ -56,6 +56,13 @@ COMPONENT segmented {
     touch_target 48
 }
 
+COMPONENT fab_small {
+    size EXACT 40 ±1
+    icon_size 24
+    touch_target 48
+    corner_radius @shape.medium
+}
+
 COMPONENT fab {
     size EXACT 56 ±1
     icon_size 24
@@ -102,6 +109,13 @@ COMPONENT icon_button {
 }
 
 COMPONENT slider {
+    track_height 4
+    thumb_idle 20
+    thumb_pressed 28
+    touch_target 48
+}
+
+COMPONENT range_slider {
     track_height 4
     thumb_idle 20
     thumb_pressed 28
