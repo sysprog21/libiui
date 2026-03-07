@@ -507,8 +507,8 @@ static inline iui_vec2 iui_vec2_add(iui_vec2 a, iui_vec2 b)
 
 static inline bool in_rect(const iui_rect_t *rect, iui_vec2 pos)
 {
-    return ((pos.x >= rect->x) && (pos.x <= rect->x + rect->width) &&
-            (pos.y >= rect->y) && (pos.y <= rect->y + rect->height));
+    return ((pos.x >= rect->x) && (pos.x < rect->x + rect->width) &&
+            (pos.y >= rect->y) && (pos.y < rect->y + rect->height));
 }
 
 static inline void expand_rect(iui_rect_t *rect, float amount)
