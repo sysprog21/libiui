@@ -520,9 +520,9 @@ static void test_focus_switch_between_fields(void)
     ASSERT_TRUE(iui_textfield_is_registered(ctx, buf2));
 
     /* Frame 2: Click on field 2 to transfer focus.
-     * Field 2 starts at ~96dp (after field 1), click at y=120.
+     * Field 2 is after field 1; click past ~96dp at y=119.
      */
-    iui_update_mouse_pos(ctx, 150.0f, 120.0f);
+    iui_update_mouse_pos(ctx, 150.0f, 119.0f);
     iui_update_mouse_buttons(ctx, IUI_MOUSE_LEFT, 0);
     iui_begin_frame(ctx, 1.0f / 60.0f);
     iui_begin_window(ctx, "Test", 0, 0, 300, 300, 0);

@@ -1296,6 +1296,10 @@ bool iui_switch(iui_context *ctx,
     /* Expand touch target for accessibility (48dp minimum per MD3) */
     iui_rect_t touch_rect = track_rect;
     iui_expand_touch_target_h(&touch_rect, IUI_SWITCH_TOUCH_TARGET);
+    if (touch_rect.height > ctx->row_height) {
+        touch_rect.y = ctx->layout.y;
+        touch_rect.height = ctx->row_height;
+    }
 
     iui_state_t state = iui_get_component_state(ctx, touch_rect, false);
 
