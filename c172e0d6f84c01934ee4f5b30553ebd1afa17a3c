@@ -1,0 +1,40 @@
+src/chips.c
+  c850b751963eb37a 224,229-230,234-235,239
+src/draw.c
+  c850b751963eb37a 1233,1237-1240
+src/internal.h
+  c850b751963eb37a 1195-1198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "c172e0d6f84c01934ee4f5b30553ebd1afa17a3c",
+  "prompts": {
+    "3197d47f1b11618e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cccbf-30b3-78c3-8b2d-3f7d8fabf560",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Jim Huang <jserv@ccns.ncku.edu.tw>",
+      "messages": [],
+      "total_additions": 2030,
+      "total_deletions": 0,
+      "accepted_lines": 2030,
+      "overriden_lines": 0
+    },
+    "c850b751963eb37a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "33b086f7-c704-4282-9e5e-18517e40b19b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang <jserv@ccns.ncku.edu.tw>",
+      "messages": [],
+      "total_additions": 32,
+      "total_deletions": 21,
+      "accepted_lines": 15,
+      "overriden_lines": 6
+    }
+  }
+}
