@@ -1,0 +1,25 @@
+src/draw.c
+  c850b751963eb37a 412-413,416-420
+src/chips.c
+  c850b751963eb37a 194-195,197-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "d70d8eb386a2786aae5a29a3792a7bf50191cc0e",
+  "prompts": {
+    "c850b751963eb37a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "33b086f7-c704-4282-9e5e-18517e40b19b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang <jserv@ccns.ncku.edu.tw>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 2,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
